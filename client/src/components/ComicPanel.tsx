@@ -36,17 +36,19 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
           <p>Generating comic panel...</p>
         </div>
       ) : imageUrl ? (
-        <div className="comic-panel-image-container">
-          <img 
-            src={imageUrl} 
-            alt="Comic panel" 
-            className="comic-panel-image"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              target.parentElement?.classList.add('image-error');
-            }}
-          />
+        <>
+          <div className="comic-panel-image-container">
+            <img 
+              src={imageUrl} 
+              alt="Comic panel" 
+              className="comic-panel-image"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                target.parentElement?.classList.add('image-error');
+              }}
+            />
+          </div>
           <div className="comic-panel-overlay">
             {displayDialogue.length > 0 && (
               <div className="comic-panel-dialogue">
@@ -60,9 +62,11 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
             {displayNarration && (
               <div className="comic-panel-narration">{displayNarration}</div>
             )}
-            <div className="comic-panel-text">{displayText}</div>
+            {displayText && (
+              <div className="comic-panel-text">{displayText}</div>
+            )}
           </div>
-        </div>
+        </>
       ) : (
         <div className="comic-panel-text-only">
           {panelNumber && (

@@ -243,9 +243,13 @@ router.post('/:characterId/action', async (req, res) => {
       outcome: storyResponse.outcome || 'Action processed'
     };
 
-    if (imageData) {
-      storyEvent.imageUrl = imageData.imageUrl;
-      storyEvent.imagePrompt = imageData.imagePrompt;
+    // Store panel images in story event if available
+    if (storyResponse.panels && storyResponse.panels.length > 0) {
+      const firstPanel = storyResponse.panels[0];
+      if (firstPanel.imageUrl) {
+        storyEvent.imageUrl = firstPanel.imageUrl;
+        storyEvent.imagePrompt = firstPanel.imagePrompt;
+      }
     }
 
     character.storyHistory.push(storyEvent);
