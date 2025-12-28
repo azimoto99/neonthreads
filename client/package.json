@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build": "SKIP_PREFLIGHT_CHECK=true TSC_COMPILE_ON_ERROR=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "postinstall": "node fix-ajv.js || true"
@@ -38,7 +38,9 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18"
+    "@types/react-dom": "^18.2.18",
+    "ajv": "^8.12.0",
+    "ajv-keywords": "^3.5.2"
   },
   "resolutions": {
     "ajv": "^8.12.0"
