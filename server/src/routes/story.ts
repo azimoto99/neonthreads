@@ -280,7 +280,7 @@ router.post('/:characterId/action', async (req, res) => {
           if (existingItem) {
             existingItem.quantity += 1;
           } else {
-            inventory.push({ name: itemName, type: 'misc', quantity: 1 });
+            inventory.push({ name: itemName, type: 'misc', quantity: 1, description: '' });
           }
         } else if (change.startsWith('-')) {
           const itemName = change.substring(1).trim();
