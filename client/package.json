@@ -41,9 +41,7 @@
     "@types/react-dom": "^18.2.18"
   },
   "resolutions": {
-    "ajv": "^8.12.0",
-    "**/ajv": "^8.12.0",
-    "**/ajv-keywords": "^5.1.0"
+    "ajv": "^8.12.0"
   },
   "overrides": {
     "ajv": "^8.12.0",
@@ -51,9 +49,7 @@
     "fork-ts-checker-webpack-plugin": {
       "ajv": "^8.12.0",
       "ajv-keywords": "^5.1.0"
-    },
-    "**/ajv": "^8.12.0",
-    "**/ajv-keywords": "^5.1.0"
+    }
   }
 }
 
