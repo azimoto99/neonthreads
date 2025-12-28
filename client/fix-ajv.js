@@ -12,7 +12,7 @@ if (fs.existsSync(pluginPath)) {
     console.log('Fixing nested ajv dependencies...');
     process.chdir(path.join(__dirname, 'node_modules', 'fork-ts-checker-webpack-plugin'));
     try {
-      execSync('npm install ajv@^8.12.0 ajv-keywords@^5.1.0 --no-save --legacy-peer-deps', { stdio: 'inherit' });
+      execSync('npm install ajv@^8.12.0 ajv-keywords@^3.5.2 --no-save --legacy-peer-deps', { stdio: 'inherit' });
       console.log('Fixed nested ajv dependencies');
     } catch (e) {
       console.log('Could not fix nested dependencies, continuing...');
