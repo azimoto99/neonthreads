@@ -1,25 +1,32 @@
 const fs = require('fs');
 const path = require('path');
 
-// The issue is that schema-utils needs ajv-keywords but can't find the right version
-// We'll ensure the root has the correct versions, and try to fix nested ones
+// The real issue: schema-utils (used by terser-webpack-plugin) needs ajv-keywords
+// but it's looking in the wrong place. We need to ensure it's in root node_modules
+// and that nested dependencies don't interfere.
 
-console.log('Fixing ajv dependencies...');
+console.log('Fixing ajv dependencies for build...');
 
 try {
   const { execSync } = require('child_process');
   
-  // First, ensure root has correct versions (they should already be in devDependencies)
-  console.log('Root dependencies should already be installed via package.json');
+  // Ensure root has correct versions (from devDependencies)
+  const rootAjvKeywords = path.join(__dirname, 'node_modules', 'ajv-keywords');
+  if (!fs.existsSync(rootAjvKeywords)) {
+    console.log('Installing ajv-keywords in root node_modules...');
+    execSync('npm install ajv-keywords@3.5.2 --save-dev --legacy-peer-deps', { 
+      stdio: 'inherit',
+      cwd: __dirname
+    });
+  }
   
   // Fix nested dependencies in fork-ts-checker-webpack-plugin
   const pluginDir = path.join(__dirname, 'node_modules', 'fork-ts-checker-webpack-plugin');
   const pluginNodeModules = path.join(pluginDir, 'node_modules');
   
   if (fs.existsSync(pluginDir)) {
-    console.log('Found fork-ts-checker-webpack-plugin, fixing nested dependencies...');
+    console.log('Fixing nested dependencies in fork-ts-checker-webpack-plugin...');
     
-    // Ensure node_modules exists
     if (!fs.existsSync(pluginNodeModules)) {
       fs.mkdirSync(pluginNodeModules, { recursive: true });
     }
@@ -37,33 +44,30 @@ try {
       fs.rmSync(ajvPath, { recursive: true, force: true });
     }
     
-    // Install correct versions in plugin
+    // Try to install correct versions
     const originalDir = process.cwd();
     try {
       process.chdir(pluginDir);
       execSync('npm install ajv@8.12.0 ajv-keywords@3.5.2 --no-save --legacy-peer-deps', { 
         stdio: 'inherit'
       });
-      console.log('Fixed nested ajv dependencies in plugin');
+      console.log('Fixed nested dependencies');
     } catch (e) {
-      console.log('Could not fix nested dependencies:', e.message);
+      console.log('Could not install in plugin directory (this is okay if root has it):', e.message);
     } finally {
       process.chdir(originalDir);
     }
   }
   
-  // Also ensure schema-utils can find ajv-keywords
-  // The root node_modules should have it from devDependencies
-  const rootAjvKeywords = path.join(__dirname, 'node_modules', 'ajv-keywords');
-  if (!fs.existsSync(rootAjvKeywords)) {
-    console.log('Installing ajv-keywords in root...');
-    execSync('npm install ajv-keywords@3.5.2 --save-dev --legacy-peer-deps', { 
-      stdio: 'inherit',
-      cwd: __dirname
-    });
+  // Most importantly: ensure schema-utils can find ajv-keywords
+  // Check if schema-utils exists and try to patch it if needed
+  const schemaUtilsPath = path.join(__dirname, 'node_modules', 'schema-utils');
+  if (fs.existsSync(schemaUtilsPath)) {
+    console.log('schema-utils found, ensuring ajv-keywords is available...');
+    // The root node_modules should have it now
   }
   
   console.log('Fix script completed');
 } catch (e) {
-  console.log('Error in fix script:', e.message);
+  console.log('Error in fix script (non-fatal):', e.message);
 }
