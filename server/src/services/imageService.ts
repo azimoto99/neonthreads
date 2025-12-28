@@ -47,28 +47,17 @@ export class ImageService {
     basePrompt += `cyberware and augmentations: ${augmentations}, `;
     basePrompt += `location setting: ${location}, `;
 
-    // ONLY use visual descriptions - ignore dialogue and narration text
+    // ONLY use visual descriptions - focus on the single panel being generated
     if (storyContext?.panels && storyContext.panels.length > 0) {
-      // Use ONLY the visual description from panels - ignore dialogue/narration
-      const firstPanel = storyContext.panels[0];
+      // Use ONLY the visual description from the panel being generated
+      const panel = storyContext.panels[0]; // Should only be one panel
       // Clean the visual description to remove any text references
-      let visualDesc = firstPanel.visualDescription
+      let visualDesc = panel.visualDescription
         .replace(/dialogue|speech|text|narration|caption/gi, '')
         .replace(/["']/g, '')
         .trim();
       
       basePrompt += `visual scene composition: ${visualDesc}, `;
-      
-      // Optionally add context from other panels' visuals only
-      if (storyContext.panels.length > 1) {
-        const otherVisuals = storyContext.panels.slice(1)
-          .map(p => p.visualDescription.replace(/dialogue|speech|text|narration|caption/gi, '').trim())
-          .filter(v => v.length > 0)
-          .join(', ');
-        if (otherVisuals) {
-          basePrompt += `additional visual elements: ${otherVisuals}, `;
-        }
-      }
     } else {
       // Fallback to scenario text, but clean it
       const scenarioVisual = scenario

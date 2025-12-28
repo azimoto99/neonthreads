@@ -50,25 +50,29 @@ router.post('/:characterId/scenario', async (req, res) => {
     const storyHistory = character.storyHistory.map(e => e.description);
     const storyResponse = await AIService.generateStoryScenario(character, storyHistory);
 
-    // Generate comic panel image with full story context
-    let imageData: { imageUrl: string; imagePrompt: string } | null = null;
-    try {
-      imageData = await ImageService.generateComicPanel(
-        character, 
-        storyResponse.scenario, 
-        'story',
-        {
-          panels: storyResponse.panels,
-          outcome: storyResponse.outcome,
-          consequences: storyResponse.consequences
+    // Generate images for each panel individually
+    if (storyResponse.panels && storyResponse.panels.length > 0) {
+      // Generate image for the first panel only (to start)
+      // We'll generate others on-demand or sequentially
+      try {
+        const firstPanel = storyResponse.panels[0];
+        const imageData = await ImageService.generateComicPanel(
+          character, 
+          storyResponse.scenario, 
+          'story',
+          {
+            panels: [firstPanel], // Only pass the single panel
+            outcome: storyResponse.outcome,
+            consequences: storyResponse.consequences
+          }
+        );
+        if (imageData && storyResponse.panels[0]) {
+          storyResponse.panels[0].imageUrl = imageData.imageUrl;
+          storyResponse.panels[0].imagePrompt = imageData.imagePrompt;
         }
-      );
-      if (imageData) {
-        storyResponse.imageUrl = imageData.imageUrl;
-        storyResponse.imagePrompt = imageData.imagePrompt;
+      } catch (error) {
+        console.error('Image generation failed for first panel, continuing without image:', error);
       }
-    } catch (error) {
-      console.error('Image generation failed, continuing without image:', error);
     }
 
     // Update character's current scene
@@ -104,9 +108,13 @@ router.post('/:characterId/scenario', async (req, res) => {
       outcome: storyResponse.outcome || 'Story scenario generated'
     };
 
-    if (imageData) {
-      storyEvent.imageUrl = imageData.imageUrl;
-      storyEvent.imagePrompt = imageData.imagePrompt;
+    // Store panel images in story event if available
+    if (storyResponse.panels && storyResponse.panels.length > 0) {
+      const firstPanel = storyResponse.panels[0];
+      if (firstPanel.imageUrl) {
+        storyEvent.imageUrl = firstPanel.imageUrl;
+        storyEvent.imagePrompt = firstPanel.imagePrompt;
+      }
     }
 
     character.storyHistory.push(storyEvent);
@@ -180,26 +188,28 @@ router.post('/:characterId/action', async (req, res) => {
       storyHistory
     );
 
-    // Generate comic panel image with full story context
-    let imageData: { imageUrl: string; imagePrompt: string } | null = null;
-    try {
-      const imageType = storyResponse.combat ? 'combat' : 'outcome';
-      imageData = await ImageService.generateComicPanel(
-        character, 
-        storyResponse.scenario, 
-        imageType,
-        {
-          panels: storyResponse.panels,
-          outcome: storyResponse.outcome,
-          consequences: storyResponse.consequences
+    // Generate image for the first panel only
+    if (storyResponse.panels && storyResponse.panels.length > 0) {
+      try {
+        const firstPanel = storyResponse.panels[0];
+        const imageType = storyResponse.combat ? 'combat' : 'outcome';
+        const imageData = await ImageService.generateComicPanel(
+          character, 
+          storyResponse.scenario, 
+          imageType,
+          {
+            panels: [firstPanel], // Only pass the single panel
+            outcome: storyResponse.outcome,
+            consequences: storyResponse.consequences
+          }
+        );
+        if (imageData && storyResponse.panels[0]) {
+          storyResponse.panels[0].imageUrl = imageData.imageUrl;
+          storyResponse.panels[0].imagePrompt = imageData.imagePrompt;
         }
-      );
-      if (imageData) {
-        storyResponse.imageUrl = imageData.imageUrl;
-        storyResponse.imagePrompt = imageData.imagePrompt;
+      } catch (error) {
+        console.error('Image generation failed for first panel, continuing without image:', error);
       }
-    } catch (error) {
-      console.error('Image generation failed, continuing without image:', error);
     }
 
     // Update character's current scene
