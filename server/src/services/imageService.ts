@@ -31,10 +31,10 @@ export class ImageService {
     const augmentations = character.augmentations;
     const location = character.currentStoryState.currentScene.replace(/_/g, ' ');
 
-    // Start with strong visual emphasis - NO TEXT BLOCKS
+    // Start with strong visual emphasis - ABSOLUTELY NO TEXT
     let basePrompt = `Anime style cyberpunk comic book illustration, `;
-    basePrompt += `visual illustration only, no large text blocks, `;
-    basePrompt += `primarily visual artwork, `;
+    basePrompt += `pure visual illustration, absolutely no text, no speech bubbles, no caption boxes, no dialogue, no narration, `;
+    basePrompt += `visual artwork only, `;
     
     if (sceneType === 'combat') {
       basePrompt += `dynamic action scene, intense battle sequence, `;
@@ -82,10 +82,9 @@ export class ImageService {
     basePrompt += `detailed background, atmospheric lighting, `;
     basePrompt += `high quality anime artwork, professional anime illustration, `;
     basePrompt += `comic book panel style, `;
-    basePrompt += `minimal text elements, only small speech bubbles if needed, `;
-    basePrompt += `focus on visual storytelling, `;
-    basePrompt += `no large text blocks, no paragraphs of text, `;
-    basePrompt += `illustration first, text secondary and minimal`;
+    basePrompt += `absolutely no text, no speech bubbles, no captions, no dialogue, no words, `;
+    basePrompt += `pure visual storytelling, `;
+    basePrompt += `illustration only, no text elements whatsoever`;
 
     return basePrompt;
   }
