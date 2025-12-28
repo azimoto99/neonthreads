@@ -64,19 +64,13 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
           {panelNumber && (
             <div className="comic-panel-number">PANEL {panelNumber}</div>
           )}
-          {displayDialogue.length > 0 && (
-            <div className="comic-panel-dialogue">
-              {displayDialogue.map((line, i) => (
-                <div key={i} className="speech-bubble">
-                  {line}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Only show story text/narration, no dialogue bubbles */}
           {displayNarration && (
             <div className="comic-panel-narration">{displayNarration}</div>
           )}
-          <div className="comic-panel-text">{displayText}</div>
+          {displayText && !displayNarration && (
+            <div className="comic-panel-text">{displayText}</div>
+          )}
         </div>
       )}
       <div className="comic-panel-border"></div>
