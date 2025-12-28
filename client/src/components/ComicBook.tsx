@@ -28,10 +28,14 @@ const ComicBook: React.FC<ComicBookProps> = ({ panels, loading = false }) => {
     );
   }
 
+  // Only show the first panel (which should have the image)
+  // If no image yet, still show the first panel with its text
+  const panelsToShow = panels.slice(0, 1);
+
   return (
     <div className="comic-book">
       <div className="comic-book-grid">
-        {panels.map((panel, index) => (
+        {panelsToShow.map((panel, index) => (
           <div key={panel.panelNumber || index} className="comic-book-panel-wrapper">
             <ComicPanel
               panelNumber={panel.panelNumber || index + 1}
