@@ -229,8 +229,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
             <div className="info-section">
               <h3>Health</h3>
               <div className="health-bar-container">
-                <div className="health-bar" style={{ width: `${(character.health || 100) / (character.maxHealth || 100) * 100}%` }}>
-                  <span className="health-text">{character.health || 100}/{character.maxHealth || 100}</span>
+                <div className="health-bar" style={{ width: `${Math.max(0, Math.min(100, ((character.health ?? 100) / (character.maxHealth ?? 100)) * 100))}%` }}>
+                  <span className="health-text">{character.health ?? 100}/{character.maxHealth ?? 100}</span>
                 </div>
               </div>
             </div>
