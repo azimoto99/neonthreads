@@ -4,7 +4,7 @@
   background: var(--bg-card);
   border: 3px solid var(--neon-cyan);
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-  overflow: hidden;
+  overflow: visible;
   border-radius: 4px;
   min-height: 300px;
 }
@@ -51,8 +51,10 @@
   margin-top: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  white-space: pre-wrap;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .comic-panel-text {
@@ -66,6 +68,8 @@
   white-space: pre-wrap;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: visible;
+  hyphens: auto;
 }
 
 .comic-panel-text-only {

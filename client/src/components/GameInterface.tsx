@@ -348,7 +348,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
                   </div>
                 )}
 
-                {!combatMode && (currentStory.requiresInput !== false) && (
+                {!combatMode && currentStory.requiresInput !== false && (
                   <form onSubmit={handleActionSubmit} className="action-form">
                     <textarea
                       value={playerAction}

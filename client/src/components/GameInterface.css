@@ -190,6 +190,9 @@
   padding: 30px;
   border-radius: 8px;
   min-height: 400px;
+  overflow: visible;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .outcome {
