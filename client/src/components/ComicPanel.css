@@ -52,6 +52,7 @@
   word-wrap: break-word;
   overflow-wrap: break-word;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 .comic-panel-text {
@@ -60,6 +61,11 @@
   line-height: 1.6;
   font-family: 'Courier New', monospace;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .comic-panel-text-only {
