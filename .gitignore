@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+package-lock.json
+client/package-lock.json
+server/package-lock.json
+
+# Environment variables
+.env
+server/.env
+client/.env
+*.env
+!.env.example
+!server/src/env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+server/neon_threads.db
+
+# Build outputs
+dist/
+build/
+client/build/
+server/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# React
+client/.pnp
+client/.pnp.js
+client/coverage
+
+# TypeScript
+*.tsbuildinfo
+
