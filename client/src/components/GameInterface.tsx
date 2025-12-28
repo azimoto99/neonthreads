@@ -11,13 +11,15 @@ interface GameInterfaceProps {
   playerId: string;
   onCharacterDeath: () => void;
   onNewCharacter: () => void;
+  onCharacterUpdate?: (character: Character) => void;
 }
 
 const GameInterface: React.FC<GameInterfaceProps> = ({ 
   character, 
   playerId, 
   onCharacterDeath,
-  onNewCharacter 
+  onNewCharacter,
+  onCharacterUpdate
 }) => {
   const [currentStory, setCurrentStory] = useState<StoryResponse | null>(null);
   const [playerAction, setPlayerAction] = useState('');
@@ -100,15 +102,28 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
       setCurrentStory(storyResponse);
       setPlayerAction('');
 
+      // Update character to reflect health/money/inventory changes
+      const updatedCharacter = await fetchCharacter();
+      if (updatedCharacter) {
+        setStoryHistory(updatedCharacter.storyHistory);
+        
+        // Update parent component with new character data (for health bar update)
+        if (onCharacterUpdate) {
+          onCharacterUpdate(updatedCharacter);
+        }
+        
+        // Check if character died (from health reaching 0)
+        if (updatedCharacter.status === 'dead' || updatedCharacter.health <= 0) {
+          setTimeout(() => {
+            alert('Your character has died. The streets of Night City are unforgiving.');
+            onCharacterDeath();
+          }, 2000);
+        }
+      }
+
       // If combat is initiated, enter combat mode
       if (storyResponse.combat) {
         setCombatMode(true);
-      } else {
-        // Update story history
-        const updatedCharacter = await fetchCharacter();
-        if (updatedCharacter) {
-          setStoryHistory(updatedCharacter.storyHistory);
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process action');
@@ -162,10 +177,21 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
           onCharacterDeath();
         }, 2000);
       } else {
-        // Update story history
+        // Update story history and character
         const updatedCharacter = await fetchCharacter();
         if (updatedCharacter) {
           setStoryHistory(updatedCharacter.storyHistory);
+          if (onCharacterUpdate) {
+            onCharacterUpdate(updatedCharacter);
+          }
+          
+          // Check if character died
+          if (updatedCharacter.status === 'dead' || updatedCharacter.health <= 0) {
+            setTimeout(() => {
+              alert('Your character has died. The streets of Night City are unforgiving.');
+              onCharacterDeath();
+            }, 2000);
+          }
         }
       }
     } catch (err) {

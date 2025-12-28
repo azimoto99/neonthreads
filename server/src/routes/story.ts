@@ -254,16 +254,72 @@ router.post('/:characterId/action', async (req, res) => {
 
     character.storyHistory.push(storyEvent);
 
+    // Apply health changes
+    if (storyResponse.healthChange !== undefined) {
+      character.health = Math.max(0, Math.min(character.maxHealth, character.health + storyResponse.healthChange));
+      
+      // Check if character died
+      if (character.health <= 0) {
+        character.status = 'dead';
+        character.health = 0;
+      }
+    }
+
+    // Apply money changes
+    if (storyResponse.moneyChange !== undefined) {
+      character.money = Math.max(0, character.money + storyResponse.moneyChange);
+    }
+
+    // Apply inventory changes
+    if (storyResponse.inventoryChanges && storyResponse.inventoryChanges.length > 0) {
+      let inventory = [...character.inventory];
+      for (const change of storyResponse.inventoryChanges) {
+        if (change.startsWith('+')) {
+          const itemName = change.substring(1).trim();
+          const existingItem = inventory.find(item => item.name === itemName);
+          if (existingItem) {
+            existingItem.quantity += 1;
+          } else {
+            inventory.push({ name: itemName, type: 'misc', quantity: 1 });
+          }
+        } else if (change.startsWith('-')) {
+          const itemName = change.substring(1).trim();
+          const index = inventory.findIndex(item => item.name === itemName);
+          if (index !== -1) {
+            inventory[index].quantity -= 1;
+            if (inventory[index].quantity <= 0) {
+              inventory.splice(index, 1);
+            }
+          }
+        }
+      }
+      character.inventory = inventory;
+    }
+
+    // Update database with all changes
     await runInsert(
-      'UPDATE characters SET current_story_state = ?, story_history = ? WHERE id = ?',
+      'UPDATE characters SET current_story_state = ?, story_history = ?, health = ?, money = ?, inventory = ?, status = ? WHERE id = ?',
       [
         JSON.stringify(character.currentStoryState),
         JSON.stringify(character.storyHistory),
+        character.health,
+        character.money,
+        JSON.stringify(character.inventory),
+        character.status,
         characterId
       ]
     );
 
-    res.json(storyResponse);
+    // Include updated character stats in response
+    const responseWithStats = {
+      ...storyResponse,
+      characterHealth: character.health,
+      characterMaxHealth: character.maxHealth,
+      characterMoney: character.money,
+      characterStatus: character.status
+    };
+
+    res.json(responseWithStats);
   } catch (error: any) {
     console.error('Error processing player action:', error);
     const errorMessage = error?.message || 'Failed to process player action';
