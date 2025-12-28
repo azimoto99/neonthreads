@@ -12,7 +12,17 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// CORS configuration - allow frontend domain
+const corsOptions = {
+  origin: process.env.APP_URL || 'http://localhost:3000',
+  credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Initialize database

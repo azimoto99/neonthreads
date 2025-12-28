@@ -1,0 +1,32 @@
+services:
+  # Backend API Service
+  - type: web
+    name: neon-threads-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: OPENROUTER_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: REPLICATE_API_TOKEN
+        sync: false  # Set this in Render dashboard
+      - key: APP_URL
+        sync: false  # Set this after frontend is deployed
+      - key: DATABASE_PATH
+        value: /opt/render/project/src/neon_threads.db
+
+  # Frontend Static Site
+  - type: static
+    name: neon-threads-client
+    buildCommand: cd client && npm install && npm run build
+    publishPath: client/build
+    envVars:
+      - key: REACT_APP_API_URL
+        sync: false  # Set this to your backend URL after deployment
+

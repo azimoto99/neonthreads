@@ -31,12 +31,15 @@ export class ImageService {
     const augmentations = character.augmentations;
     const location = character.currentStoryState.currentScene.replace(/_/g, ' ');
 
-    let basePrompt = `Anime style cyberpunk illustration, `;
+    // Start with strong visual emphasis - NO TEXT BLOCKS
+    let basePrompt = `Anime style cyberpunk comic book illustration, `;
+    basePrompt += `visual illustration only, no large text blocks, `;
+    basePrompt += `primarily visual artwork, `;
     
     if (sceneType === 'combat') {
-      basePrompt += `dynamic action scene, intense battle, `;
+      basePrompt += `dynamic action scene, intense battle sequence, `;
     } else {
-      basePrompt += `cinematic scene, `;
+      basePrompt += `cinematic dramatic scene, `;
     }
 
     basePrompt += `anime art style, detailed anime character design, `;
@@ -44,40 +47,56 @@ export class ImageService {
     basePrompt += `cyberware and augmentations: ${augmentations}, `;
     basePrompt += `location setting: ${location}, `;
 
-    // Use story context if available (panels with dialogue/narration)
+    // ONLY use visual descriptions - ignore dialogue and narration text
     if (storyContext?.panels && storyContext.panels.length > 0) {
-      // Use the first panel's visual description and dialogue for the main image
+      // Use ONLY the visual description from panels - ignore dialogue/narration
       const firstPanel = storyContext.panels[0];
-      basePrompt += `visual scene: ${firstPanel.visualDescription}, `;
+      // Clean the visual description to remove any text references
+      let visualDesc = firstPanel.visualDescription
+        .replace(/dialogue|speech|text|narration|caption/gi, '')
+        .replace(/["']/g, '')
+        .trim();
       
-      if (firstPanel.dialogue && firstPanel.dialogue.length > 0) {
-        basePrompt += `dialogue in speech bubbles: ${firstPanel.dialogue.join(', ')}, `;
-      }
+      basePrompt += `visual scene composition: ${visualDesc}, `;
       
-      if (firstPanel.narration) {
-        basePrompt += `narration caption: ${firstPanel.narration}, `;
+      // Optionally add context from other panels' visuals only
+      if (storyContext.panels.length > 1) {
+        const otherVisuals = storyContext.panels.slice(1)
+          .map(p => p.visualDescription.replace(/dialogue|speech|text|narration|caption/gi, '').trim())
+          .filter(v => v.length > 0)
+          .join(', ');
+        if (otherVisuals) {
+          basePrompt += `additional visual elements: ${otherVisuals}, `;
+        }
       }
     } else {
-      // Fallback to scenario text
-      const scenarioVisual = scenario.substring(0, 200).replace(/[^\w\s]/g, ' ');
+      // Fallback to scenario text, but clean it
+      const scenarioVisual = scenario
+        .substring(0, 200)
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/dialogue|speech|text|narration|caption/gi, '')
+        .trim();
       basePrompt += `visual scene elements: ${scenarioVisual}, `;
     }
 
-    // Add outcome and consequences if available
+    // Add visual context from outcome/consequences, but keep it visual
     if (storyContext?.outcome) {
-      basePrompt += `story outcome context: ${storyContext.outcome}, `;
-    }
-    
-    if (storyContext?.consequences && storyContext.consequences.length > 0) {
-      basePrompt += `consequences: ${storyContext.consequences.join(', ')}, `;
+      const visualOutcome = storyContext.outcome
+        .replace(/dialogue|speech|text|narration|caption/gi, '')
+        .substring(0, 100);
+      basePrompt += `visual outcome context: ${visualOutcome}, `;
     }
 
+    // Emphasize visual style and composition
     basePrompt += `anime cyberpunk aesthetic, vibrant neon colors, `;
     basePrompt += `anime shading and highlights, cel-shaded style, `;
     basePrompt += `detailed background, atmospheric lighting, `;
     basePrompt += `high quality anime artwork, professional anime illustration, `;
-    basePrompt += `comic book style with small speech bubbles and caption boxes, `;
-    basePrompt += `visual illustration with text elements integrated naturally`;
+    basePrompt += `comic book panel style, `;
+    basePrompt += `minimal text elements, only small speech bubbles if needed, `;
+    basePrompt += `focus on visual storytelling, `;
+    basePrompt += `no large text blocks, no paragraphs of text, `;
+    basePrompt += `illustration first, text secondary and minimal`;
 
     return basePrompt;
   }
@@ -224,6 +243,7 @@ export class ImageService {
   static async generateCharacterPortrait(character: Character): Promise<string | null> {
     try {
       const prompt = `Anime style cyberpunk character portrait illustration, 
+      visual illustration only, no text blocks, 
       anime art style, detailed anime character design, 
       character appearance: ${character.appearance}, 
       cyberware and augmentations: ${character.augmentations}, 
@@ -231,7 +251,7 @@ export class ImageService {
       anime shading and highlights, cel-shaded style, 
       vibrant neon colors, high quality anime artwork, 
       professional anime illustration, front view, detailed character design, 
-      visual illustration with optional small text elements`;
+      pure visual artwork, no dialogue, no text, illustration only`;
 
       const replicateApiKey = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY;
       

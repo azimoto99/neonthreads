@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+// Use environment variable or default path
+// On Render, use the provided path or a persistent location
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../neon_threads.db');
 
 let db: sqlite3.Database;
