@@ -5,7 +5,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: cd server && npm install && npm run build
+    buildCommand: cd server && npm install --legacy-peer-deps && npm run build
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
@@ -24,7 +24,7 @@ services:
   # Frontend Static Site
   - type: static
     name: neon-threads-client
-    buildCommand: cd client && npm install && npm run build
+    buildCommand: cd client && npm install --legacy-peer-deps && npm run build
     publishPath: client/build
     envVars:
       - key: REACT_APP_API_URL

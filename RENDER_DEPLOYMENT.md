@@ -30,7 +30,7 @@ You'll need to deploy:
 - **Branch:** `main`
 - **Root Directory:** `server`
 - **Runtime:** `Node`
-- **Build Command:** `npm install && npm run build`
+- **Build Command:** `npm install --legacy-peer-deps && npm run build`
 - **Start Command:** `npm start`
 
 ### 1.2 Environment Variables
@@ -76,7 +76,7 @@ Click **"Create Web Service"** and wait for deployment.
 - **Name:** `neon-threads-client` (or your preferred name)
 - **Branch:** `main`
 - **Root Directory:** `client`
-- **Build Command:** `npm install && npm run build`
+- **Build Command:** `npm install --legacy-peer-deps && npm run build`
 - **Publish Directory:** `build`
 
 ### 2.2 Environment Variables
