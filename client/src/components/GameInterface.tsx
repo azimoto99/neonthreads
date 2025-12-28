@@ -113,7 +113,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         }
         
         // Check if character died (from health reaching 0)
-        if (updatedCharacter.status === 'dead' || updatedCharacter.health <= 0) {
+        if (updatedCharacter.status === 'dead' || (updatedCharacter.health !== undefined && updatedCharacter.health <= 0)) {
           setTimeout(() => {
             alert('Your character has died. The streets of Night City are unforgiving.');
             onCharacterDeath();
