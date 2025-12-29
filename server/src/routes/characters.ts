@@ -1,6 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { runQuery, runInsert, parseJsonField } from '../database';
+import { runQuery, runInsert, runUpdate, parseJsonField } from '../database';
 import { ImageService } from '../services/imageService';
 import { Character, CreateCharacterRequest, InventoryItem } from '../types';
 import { authenticateToken } from '../middleware/auth';

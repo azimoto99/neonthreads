@@ -180,7 +180,7 @@ router.post('/:characterId/scenario', async (req, res) => {
     if (storyResponse.panels && storyResponse.panels.length > 0) {
       try {
         // Generate all panel images concurrently
-        const imagePromises = storyResponse.panels.map(async (panel, index) => {
+        const imagePromises = storyResponse.panels!.map(async (panel, index) => {
           try {
             const imageData = await ImageService.generateComicPanel(
               character, 
@@ -192,9 +192,9 @@ router.post('/:characterId/scenario', async (req, res) => {
                 consequences: storyResponse.consequences
               }
             );
-            if (imageData && storyResponse.panels[index]) {
-              storyResponse.panels[index].imageUrl = imageData.imageUrl;
-              storyResponse.panels[index].imagePrompt = imageData.imagePrompt;
+            if (imageData && storyResponse.panels![index]) {
+              storyResponse.panels![index].imageUrl = imageData.imageUrl;
+              storyResponse.panels![index].imagePrompt = imageData.imagePrompt;
             }
           } catch (error) {
             console.error(`Image generation failed for panel ${index}, continuing without image:`, error);
@@ -333,7 +333,7 @@ router.post('/:characterId/action', async (req, res) => {
       try {
         const imageType = storyResponse.combat ? 'combat' : 'outcome';
         // Generate all panel images concurrently
-        const imagePromises = storyResponse.panels.map(async (panel, index) => {
+        const imagePromises = storyResponse.panels!.map(async (panel, index) => {
           try {
             const imageData = await ImageService.generateComicPanel(
               character, 
@@ -345,9 +345,9 @@ router.post('/:characterId/action', async (req, res) => {
                 consequences: storyResponse.consequences
               }
             );
-            if (imageData && storyResponse.panels[index]) {
-              storyResponse.panels[index].imageUrl = imageData.imageUrl;
-              storyResponse.panels[index].imagePrompt = imageData.imagePrompt;
+            if (imageData && storyResponse.panels![index]) {
+              storyResponse.panels![index].imageUrl = imageData.imageUrl;
+              storyResponse.panels![index].imagePrompt = imageData.imagePrompt;
             }
           } catch (error) {
             console.error(`Image generation failed for panel ${index}, continuing without image:`, error);
