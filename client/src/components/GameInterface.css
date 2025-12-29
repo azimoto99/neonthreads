@@ -346,26 +346,35 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .story-text-container {
   background: var(--bg-card);
   border: 2px solid var(--neon-cyan);
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 6px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+}
+
+.story-text-header {
+  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .story-text-header h3 {
   color: var(--neon-cyan);
-  font-size: 1rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin: 0 0 10px 0;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .story-text-content {
@@ -373,25 +382,47 @@
   overflow-y: auto;
   overflow-x: hidden;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding-right: 4px;
+  min-height: 0;
+}
+
+/* Custom scrollbar for story text */
+.story-text-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.story-text-content::-webkit-scrollbar-track {
+  background: var(--bg-darker);
+  border-radius: 3px;
+}
+
+.story-text-content::-webkit-scrollbar-thumb {
+  background: var(--neon-cyan);
+  border-radius: 3px;
+}
+
+.story-text-content::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-magenta);
 }
 
 .story-scenario {
-  margin-bottom: 15px;
-  padding-bottom: 15px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .story-outcome {
-  padding: 10px;
+  padding: 8px;
   background: var(--bg-darker);
-  border-left: 4px solid var(--neon-yellow);
-  margin-bottom: 10px;
+  border-left: 3px solid var(--neon-yellow);
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  font-size: 0.8rem;
 }
 
 .story-outcome.success {
@@ -425,10 +456,11 @@
 }
 
 .story-consequences {
-  padding: 10px;
+  padding: 8px;
   background: rgba(255, 68, 68, 0.1);
-  border-left: 4px solid #ff4444;
-  margin-bottom: 10px;
+  border-left: 3px solid #ff4444;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
 }
 
 .story-consequences ul {
@@ -444,10 +476,10 @@
 
 .stat-changes {
   display: flex;
-  gap: 10px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   background: var(--bg-darker);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-radius: 4px;
   flex-wrap: wrap;
 }
@@ -470,11 +502,12 @@
 }
 
 .combat-info-inline {
-  padding: 10px;
+  padding: 8px;
   background: rgba(255, 0, 0, 0.1);
   border: 1px solid rgba(255, 0, 0, 0.3);
   border-radius: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
 }
 
 .combat-info-inline p {
@@ -522,15 +555,16 @@
 
 .chat-input {
   flex: 1;
-  padding: 12px;
+  padding: 8px;
   background: var(--bg-darker);
   border: 2px solid var(--border-color);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   resize: none;
   border-radius: 4px;
   transition: all 0.3s ease;
+  max-height: 80px;
 }
 
 .chat-input:focus {
@@ -545,8 +579,8 @@
 }
 
 .btn-chat-submit {
-  padding: 12px 24px;
-  font-size: 0.9rem;
+  padding: 8px 16px;
+  font-size: 0.8rem;
   font-family: inherit;
   font-weight: bold;
   text-transform: uppercase;
