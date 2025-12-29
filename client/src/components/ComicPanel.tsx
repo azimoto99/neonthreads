@@ -16,7 +16,7 @@ interface ComicPanelProps {
 const ComicPanel: React.FC<ComicPanelProps> = ({ 
   panelNumber,
   visualDescription, 
-  dialogue = [],
+  dialogue: _dialogue = [],
   narration,
   imageUrl,
   type = 'story', 
