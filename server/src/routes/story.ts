@@ -1,11 +1,15 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { runQuery, runInsert } from '../database';
+import { runQuery, runInsert, parseJsonField } from '../database';
 import { AIService } from '../services/aiService';
 import { ImageService } from '../services/imageService';
 import { Character, PlayerActionRequest, StoryResponse, CombatResolution, InventoryItem } from '../types';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
+
+// All story routes require authentication
+router.use(authenticateToken);
 
 /**
  * Process inventory changes contextually based on character and story
@@ -139,6 +143,12 @@ router.post('/:characterId/scenario', async (req, res) => {
     }
 
     const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const character: Character = {
       id: row.id,
       playerId: row.player_id,
@@ -146,13 +156,13 @@ router.post('/:characterId/scenario', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100
@@ -272,6 +282,12 @@ router.post('/:characterId/action', async (req, res) => {
     }
 
     const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const character: Character = {
       id: row.id,
       playerId: row.player_id,
@@ -279,13 +295,13 @@ router.post('/:characterId/action', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100
@@ -427,6 +443,12 @@ router.post('/:characterId/combat', async (req, res) => {
     }
 
     const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const character: Character = {
       id: row.id,
       playerId: row.player_id,
@@ -434,13 +456,13 @@ router.post('/:characterId/combat', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100

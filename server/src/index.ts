@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { characterRoutes } from './routes/characters';
 import { storyRoutes } from './routes/story';
+import authRoutes from './routes/auth';
 import { initDatabase } from './database';
 
 // Load environment variables from server/.env
@@ -48,6 +49,7 @@ initDatabase().then(() => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/story', storyRoutes);
 

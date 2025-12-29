@@ -114,3 +114,32 @@ export interface PlayerActionRequest {
   context?: string;
 }
 
+// User/Auth Types
+export interface User {
+  id: string;
+  email: string;
+  username?: string;
+  createdAt: string;
+  preferences?: Record<string, any>;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  username?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    username?: string;
+  };
+}
+

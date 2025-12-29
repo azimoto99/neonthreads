@@ -23,6 +23,10 @@ services:
         sync: false  # Set this after frontend is deployed
       - key: DATABASE_PATH
         value: /opt/render/project/src/neon_threads.db
+      - key: DATABASE_URL
+        sync: false  # Set this to your Render PostgreSQL database connection string
+      - key: JWT_SECRET
+        sync: false  # Set a strong random secret for JWT token signing
 
   # Frontend Static Site
   - type: static

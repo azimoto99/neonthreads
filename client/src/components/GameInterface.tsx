@@ -3,8 +3,7 @@ import './GameInterface.css';
 import BodySilhouette from './BodySilhouette';
 import LocationIndicator from './LocationIndicator';
 import { Character, StoryResponse, CombatResolution } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { authenticatedFetch } from '../utils/api';
 
 interface GameInterfaceProps {
   character: Character;
@@ -57,7 +56,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
   const loadCharacterPortrait = async () => {
     try {
       console.log('Loading character portrait for:', character.id);
-      const response = await fetch(`${API_BASE_URL}/characters/${character.id}/portrait`);
+      const response = await authenticatedFetch(`/characters/${character.id}/portrait`);
       
       if (!response.ok) {
         console.warn('Failed to load character portrait:', response.status);
@@ -84,11 +83,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/story/${character.id}/scenario`, {
+      const response = await authenticatedFetch(`/story/${character.id}/scenario`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
 
       if (!response.ok) {
@@ -115,11 +111,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/story/${character.id}/action`, {
+      const response = await authenticatedFetch(`/story/${character.id}/action`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           action: playerAction,
         }),
@@ -175,11 +168,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/story/${character.id}/combat`, {
+      const response = await authenticatedFetch(`/story/${character.id}/combat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           combatScenario: currentStory.combat,
           playerTactics: combatTactics,
@@ -235,7 +225,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
 
   const fetchCharacter = async (): Promise<Character | null> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/characters/${character.id}`);
+      const response = await authenticatedFetch(`/characters/${character.id}`);
       if (response.ok) {
         return await response.json();
       }

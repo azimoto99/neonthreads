@@ -1,10 +1,14 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { runQuery, runInsert } from '../database';
+import { runQuery, runInsert, parseJsonField } from '../database';
 import { ImageService } from '../services/imageService';
 import { Character, CreateCharacterRequest, InventoryItem } from '../types';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
+
+// All character routes require authentication
+router.use(authenticateToken);
 
 // Create a new character
 router.post('/', async (req, res) => {
@@ -17,8 +21,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Generate player ID if not provided (for MVP, we'll use a simple approach)
-    const playerId = req.body.playerId || uuidv4();
+    // Use authenticated user's ID as player ID
+    const playerId = req.userId!;
 
     // Build full description
     let fullDescription = `Background: ${background}\n`;
@@ -121,6 +125,12 @@ router.get('/:id', async (req, res) => {
     }
 
     const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const character: Character = {
       id: row.id,
       playerId: row.player_id,
@@ -128,13 +138,13 @@ router.get('/:id', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100
@@ -147,10 +157,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Get all characters for a player
-router.get('/player/:playerId', async (req, res) => {
+// Get all characters for the authenticated user
+router.get('/my-characters', async (req, res) => {
   try {
-    const { playerId } = req.params;
+    const playerId = req.userId!;
     const rows = await runQuery<any[]>(
       'SELECT * FROM characters WHERE player_id = ? ORDER BY created_at DESC',
       [playerId]
@@ -163,13 +173,13 @@ router.get('/player/:playerId', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100
@@ -227,13 +237,13 @@ router.get('/:id/portrait', async (req, res) => {
       augmentations: row.augmentations,
       appearance: row.appearance,
       trade: row.trade,
-      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      optionalPrompts: parseJsonField(row.optional_prompts),
       fullDescription: row.full_description,
       createdAt: row.created_at,
-      currentStoryState: JSON.parse(row.current_story_state),
+      currentStoryState: parseJsonField(row.current_story_state),
       status: row.status,
-      storyHistory: JSON.parse(row.story_history),
-      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
       money: row.money || 500,
       health: row.health || 100,
       maxHealth: row.max_health || 100

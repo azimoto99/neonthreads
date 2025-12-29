@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import './CharacterCreation.css';
 import { Character, CreateCharacterRequest } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { authenticatedFetch } from '../utils/api';
 
 interface CharacterCreationProps {
   playerId: string;
   onCharacterCreated: (character: Character) => void;
 }
 
-const CharacterCreation: React.FC<CharacterCreationProps> = ({ playerId, onCharacterCreated }) => {
+const CharacterCreation: React.FC<CharacterCreationProps> = ({ onCharacterCreated }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<CreateCharacterRequest>({
     background: '',
@@ -120,15 +119,9 @@ const CharacterCreation: React.FC<CharacterCreationProps> = ({ playerId, onChara
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/characters`, {
+      const response = await authenticatedFetch('/characters', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          playerId
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
