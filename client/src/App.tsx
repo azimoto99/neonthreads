@@ -51,7 +51,7 @@ function App() {
     }
   };
 
-  const handleLogin = (token: string, userData: { id: string; email: string; username?: string }) => {
+  const handleLogin = (_token: string, userData: { id: string; email: string; username?: string }) => {
     setUser(userData);
     setIsAuthenticated(true);
     setAuthState('authenticated');

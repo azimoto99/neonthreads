@@ -4,7 +4,6 @@ import { Character, CreateCharacterRequest } from '../types';
 import { authenticatedFetch } from '../utils/api';
 
 interface CharacterCreationProps {
-  playerId: string;
   onCharacterCreated: (character: Character) => void;
 }
 
