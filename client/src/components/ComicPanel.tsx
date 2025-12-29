@@ -25,7 +25,6 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
 }) => {
   // Use legacy text if provided (for backward compatibility)
   const displayText = text || visualDescription || '';
-  const displayDialogue = dialogue || [];
   const displayNarration = narration;
 
   return (

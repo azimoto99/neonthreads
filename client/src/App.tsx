@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import CharacterCreation from './components/CharacterCreation';
 import GameInterface from './components/GameInterface';

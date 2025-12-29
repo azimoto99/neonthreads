@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './GameInterface.css';
-import ComicBook from './ComicBook';
-import ComicPanel from './ComicPanel';
 import BodySilhouette from './BodySilhouette';
 import LocationIndicator from './LocationIndicator';
 import { Character, StoryResponse, CombatResolution } from '../types';
@@ -17,7 +15,7 @@ interface GameInterfaceProps {
 
 const GameInterface: React.FC<GameInterfaceProps> = ({ 
   character, 
-  playerId, 
+  playerId: _playerId, 
   onCharacterDeath,
   onNewCharacter 
 }) => {
@@ -27,7 +25,6 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [combatMode, setCombatMode] = useState(false);
   const [combatTactics, setCombatTactics] = useState('');
-  const [storyHistory, setStoryHistory] = useState(character.storyHistory);
   const [characterPortrait, setCharacterPortrait] = useState<string | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<Character>(character);
@@ -141,7 +138,6 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         const updatedCharacter = await fetchCharacter();
         if (updatedCharacter) {
           setCurrentCharacter(updatedCharacter);
-          setStoryHistory(updatedCharacter.storyHistory);
           // Update character state - this will trigger re-render with new health/money
           // Check if inventory or appearance changed and regenerate portrait
           const inventoryChanged = JSON.stringify(updatedCharacter.inventory) !== JSON.stringify(currentCharacter.inventory);
@@ -213,7 +209,6 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
       const updatedCharacter = await fetchCharacter();
       if (updatedCharacter) {
         setCurrentCharacter(updatedCharacter);
-        setStoryHistory(updatedCharacter.storyHistory);
         // Check if inventory or appearance changed and regenerate portrait
         const inventoryChanged = JSON.stringify(updatedCharacter.inventory) !== JSON.stringify(currentCharacter.inventory);
         const appearanceChanged = updatedCharacter.appearance !== currentCharacter.appearance;

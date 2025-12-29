@@ -19,19 +19,19 @@ const BodySilhouette: React.FC<BodySilhouetteProps> = ({
   const healthPercent = (health / maxHealth) * 100;
   
   // Determine body part damage based on health percentage
-  const getBodyPartDamage = (part: string): number => {
+  const getBodyPartDamage = (): number => {
     if (healthPercent > 75) return 0;
     if (healthPercent > 50) return 1; // Light damage
     if (healthPercent > 25) return 2; // Moderate damage
     return 3; // Severe damage
   };
 
-  const headDamage = getBodyPartDamage('head');
-  const torsoDamage = getBodyPartDamage('torso');
-  const leftArmDamage = getBodyPartDamage('leftArm');
-  const rightArmDamage = getBodyPartDamage('rightArm');
-  const leftLegDamage = getBodyPartDamage('leftLeg');
-  const rightLegDamage = getBodyPartDamage('rightLeg');
+  const headDamage = getBodyPartDamage();
+  const torsoDamage = getBodyPartDamage();
+  const leftArmDamage = getBodyPartDamage();
+  const rightArmDamage = getBodyPartDamage();
+  const leftLegDamage = getBodyPartDamage();
+  const rightLegDamage = getBodyPartDamage();
 
   const getDamageColor = (damage: number): string => {
     switch (damage) {
