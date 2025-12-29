@@ -14,8 +14,10 @@ services:
         value: 10000
       - key: OPENROUTER_API_KEY
         sync: false  # Set this in Render dashboard
-      - key: REPLICATE_API_TOKEN
-        sync: false  # Set this in Render dashboard
+      - key: AI_HORDE_API_KEY
+        sync: false  # Set this in Render dashboard (optional but recommended)
+      - key: AI_HORDE_MODEL
+        value: Deliberate
       - key: APP_URL
         sync: false  # Set this after frontend is deployed
       - key: DATABASE_PATH

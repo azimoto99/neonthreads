@@ -1,0 +1,42 @@
+.location-indicator {
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.location-header h3 {
+  color: var(--neon-cyan);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+  text-align: center;
+}
+
+.location-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.location-name {
+  color: var(--neon-yellow);
+  font-size: 0.85rem;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 0 0 8px var(--neon-yellow);
+  letter-spacing: 1px;
+}
+
+.scene-name {
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+

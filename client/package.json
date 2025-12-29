@@ -8,14 +8,16 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "typescript": "^5.3.3",
-    "axios": "^1.6.2"
+    "axios": "^1.6.2",
+    "ajv": "^8.12.0",
+    "ajv-keywords": "^3.5.2"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "postinstall": "node fix-dependencies.js || true"
+    "postinstall": "node fix-ajv.js || true"
   },
   "eslintConfig": {
     "extends": [
@@ -37,6 +39,17 @@
   "devDependencies": {
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18"
+  },
+  "resolutions": {
+    "ajv": "^8.12.0"
+  },
+  "overrides": {
+    "ajv": "^8.12.0",
+    "ajv-keywords": "^3.5.2",
+    "fork-ts-checker-webpack-plugin": {
+      "ajv": "^8.12.0",
+      "ajv-keywords": "^3.5.2"
+    }
   }
 }
 

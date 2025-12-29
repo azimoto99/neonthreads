@@ -41,13 +41,15 @@ Add these environment variables in Render dashboard:
 NODE_ENV=production
 PORT=10000
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-REPLICATE_API_TOKEN=your_replicate_api_token_here
+AI_HORDE_API_KEY=your_ai_horde_api_key_here
+AI_HORDE_MODEL=Deliberate
 APP_URL=https://your-frontend-url.onrender.com
 DATABASE_PATH=/opt/render/project/src/neon_threads.db
 ```
 
 **Important:**
 - Replace `your_openrouter_api_key_here` with your actual OpenRouter API key
+- Replace `your_ai_horde_api_key_here` with your AI Horde API key (optional but recommended for priority queue)
 - Replace `your-frontend-url.onrender.com` with your actual frontend URL (you'll get this after deploying the frontend)
 - Render provides `PORT` automatically, but you can set it to `10000` or use the provided `PORT` env var
 
@@ -179,9 +181,9 @@ For persistent data, use Render's PostgreSQL:
 - Check backend CORS settings allow your frontend domain
 
 **Images Don't Load:**
-- Check Replicate API token is set
-- Verify API credits are available
-- Check backend logs for image generation errors
+- Check AI Horde API key is set (optional but recommended)
+- Verify image generation is working (check backend logs)
+- Note: AI Horde is free but may have queue wait times
 
 ---
 
@@ -192,7 +194,8 @@ For persistent data, use Render's PostgreSQL:
 NODE_ENV=production
 PORT=10000
 OPENROUTER_API_KEY=sk-or-your-key
-REPLICATE_API_TOKEN=r8_your-token
+AI_HORDE_API_KEY=your-ai-horde-key
+AI_HORDE_MODEL=Deliberate
 APP_URL=https://your-frontend.onrender.com
 DATABASE_PATH=/opt/render/project/src/neon_threads.db
 ```

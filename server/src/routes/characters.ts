@@ -1,6 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runQuery, runInsert } from '../database';
+import { ImageService } from '../services/imageService';
 import { Character, CreateCharacterRequest, InventoryItem } from '../types';
 
 const router = express.Router();
@@ -200,6 +201,83 @@ router.patch('/:id/status', async (req, res) => {
   } catch (error) {
     console.error('Error updating character status:', error);
     res.status(500).json({ error: 'Failed to update character status' });
+  }
+});
+
+// Generate character portrait
+router.get('/:id/portrait', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const forceRegenerate = req.query.force === 'true';
+    
+    const rows = await runQuery<any[]>(
+      'SELECT * FROM characters WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const row = rows[0];
+    const character: Character = {
+      id: row.id,
+      playerId: row.player_id,
+      background: row.background,
+      augmentations: row.augmentations,
+      appearance: row.appearance,
+      trade: row.trade,
+      optionalPrompts: row.optional_prompts ? JSON.parse(row.optional_prompts) : undefined,
+      fullDescription: row.full_description,
+      createdAt: row.created_at,
+      currentStoryState: JSON.parse(row.current_story_state),
+      status: row.status,
+      storyHistory: JSON.parse(row.story_history),
+      inventory: row.inventory ? JSON.parse(row.inventory) : [],
+      money: row.money || 500,
+      health: row.health || 100,
+      maxHealth: row.max_health || 100
+    };
+
+    // Compute current appearance hash
+    const currentHash = ImageService.getAppearanceHash(character);
+    
+    // Check if we have a stored portrait hash (we'll store it in story_state for now)
+    const storedHash = character.currentStoryState.portraitHash;
+    
+    // Regenerate if forced, hash changed, or no hash exists
+    if (forceRegenerate || !storedHash || storedHash !== currentHash) {
+      console.log('Generating character portrait for:', character.id, forceRegenerate ? '(forced)' : '(appearance changed)');
+      const portraitUrl = await ImageService.generateCharacterPortrait(character);
+
+      if (!portraitUrl) {
+        return res.status(500).json({ error: 'Failed to generate character portrait' });
+      }
+
+      // Update portrait hash in story state
+      character.currentStoryState.portraitHash = currentHash;
+      await runInsert(
+        'UPDATE characters SET current_story_state = ? WHERE id = ?',
+        [JSON.stringify(character.currentStoryState), id]
+      );
+
+      res.json({ portraitUrl, hash: currentHash });
+    } else {
+      // Portrait is still valid, but we need to return it
+      // For now, we'll regenerate anyway since we don't store the URL
+      // In a production system, you'd store the portrait URL in the database
+      console.log('Portrait hash unchanged, regenerating anyway (URL not stored)');
+      const portraitUrl = await ImageService.generateCharacterPortrait(character);
+      
+      if (!portraitUrl) {
+        return res.status(500).json({ error: 'Failed to generate character portrait' });
+      }
+      
+      res.json({ portraitUrl, hash: currentHash });
+    }
+  } catch (error) {
+    console.error('Error generating character portrait:', error);
+    res.status(500).json({ error: 'Failed to generate character portrait' });
   }
 });
 

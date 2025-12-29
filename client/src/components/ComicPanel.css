@@ -4,7 +4,7 @@
   background: var(--bg-card);
   border: 3px solid var(--neon-cyan);
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-  overflow: visible;
+  overflow: hidden;
   border-radius: 4px;
   min-height: 300px;
 }
@@ -49,12 +49,6 @@
   background: rgba(0, 0, 0, 0.8);
   padding: 20px;
   margin-top: 0;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: visible;
 }
 
 .comic-panel-text {
@@ -63,13 +57,6 @@
   line-height: 1.6;
   font-family: 'Courier New', monospace;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: visible;
-  hyphens: auto;
 }
 
 .comic-panel-text-only {
@@ -190,10 +177,6 @@
 
 /* Narration boxes */
 .comic-panel-narration {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-  max-width: 100%;
   background: rgba(0, 0, 0, 0.7);
   color: var(--text-primary);
   padding: 10px 15px;

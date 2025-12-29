@@ -69,7 +69,6 @@ function App() {
         playerId={playerId}
         onCharacterDeath={handleCharacterDeath}
         onNewCharacter={() => setCurrentCharacter(null)}
-        onCharacterUpdate={(updatedCharacter) => setCurrentCharacter(updatedCharacter)}
       />
     </div>
   );

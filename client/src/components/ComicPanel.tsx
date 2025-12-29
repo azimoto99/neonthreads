@@ -44,8 +44,12 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
               className="comic-panel-image"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
+                console.error('Image failed to load:', imageUrl?.substring(0, 100));
                 target.style.display = 'none';
                 target.parentElement?.classList.add('image-error');
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully');
               }}
             />
           </div>

@@ -6,7 +6,7 @@ A cyberpunk multiplayer storytelling game with AI-generated comic book panels.
 
 - 🎮 **Interactive Storytelling** - AI-driven narrative that responds to your actions
 - 🎨 **6-Panel Comic Book Layout** - Stories displayed as comic book panels with dialogue
-- 🖼️ **AI-Generated Images** - Anime-style illustrations using Google Imagen-4
+- 🖼️ **AI-Generated Images** - Anime-style illustrations using AI Horde (Stable Diffusion)
 - 💰 **Inventory & Money System** - Track items and currency
 - ⚔️ **Challenging Gameplay** - Actions can fail, consequences matter
 - 🎭 **Character Creation** - Deep character customization
@@ -18,7 +18,7 @@ A cyberpunk multiplayer storytelling game with AI-generated comic book panels.
 - **Backend:** Node.js + Express + TypeScript
 - **Database:** SQLite
 - **AI Story Generation:** OpenRouter (Claude via xiaomi/mimo-v2-flash:free)
-- **Image Generation:** Google Imagen-4 via Replicate
+- **Image Generation:** AI Horde (Stable Diffusion)
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ A cyberpunk multiplayer storytelling game with AI-generated comic book panels.
 
 - Node.js 18+ and npm
 - OpenRouter API key (for story generation)
-- Replicate API token (for image generation - optional)
+- AI Horde API key (for image generation - optional but recommended)
 
 ### Installation
 
@@ -47,7 +47,8 @@ Create `server/.env`:
 ```env
 PORT=3001
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-REPLICATE_API_TOKEN=your_replicate_api_token_here
+AI_HORDE_API_KEY=your_ai_horde_api_key_here
+AI_HORDE_MODEL=Deliberate
 APP_URL=http://localhost:3000
 NODE_ENV=development
 DATABASE_PATH=./neon_threads.db
@@ -90,12 +91,13 @@ neon-threads/
 2. Get your API key from https://openrouter.ai/keys
 3. Add to `server/.env` as `OPENROUTER_API_KEY`
 
-### Replicate API Token (Optional - for images)
+### AI Horde API Key (Optional - for priority queue access)
 
-1. Sign up at https://replicate.com/
-2. Get your token from https://replicate.com/account/api-tokens
-3. Add credits at https://replicate.com/account/billing
-4. Add to `server/.env` as `REPLICATE_API_TOKEN`
+1. Sign up at https://stablehorde.net/register
+2. Get your API key from your account dashboard
+3. Add to `server/.env` as `AI_HORDE_API_KEY`
+4. Optionally set `AI_HORDE_MODEL` to use a different model (default: "Deliberate")
+5. Note: AI Horde is free and community-driven. API key provides priority queue access but is not required.
 
 See [OPENROUTER_SETUP.md](./OPENROUTER_SETUP.md) and [API_KEY_SETUP.md](./API_KEY_SETUP.md) for detailed instructions.
 

@@ -7,6 +7,122 @@ import { Character, PlayerActionRequest, StoryResponse, CombatResolution, Invent
 
 const router = express.Router();
 
+/**
+ * Process inventory changes contextually based on character and story
+ */
+function processInventoryChanges(
+  character: Character,
+  inventoryChanges: string[],
+  storyContext: string
+): InventoryItem[] {
+  const inventory = [...(character.inventory || [])];
+  
+  for (const change of inventoryChanges) {
+    if (change.startsWith('+')) {
+      // Add item
+      const itemName = change.substring(1).trim();
+      // Find if item already exists
+      const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === itemName.toLowerCase());
+      
+      if (existingIndex >= 0) {
+        // Increment quantity
+        inventory[existingIndex].quantity += 1;
+      } else {
+        // Add new item - determine type based on name and context
+        let itemType: 'weapon' | 'tool' | 'consumable' | 'cyberware' | 'misc' = 'misc';
+        const lowerName = itemName.toLowerCase();
+        
+        if (lowerName.includes('weapon') || lowerName.includes('gun') || lowerName.includes('knife') || 
+            lowerName.includes('sword') || lowerName.includes('blade') || lowerName.includes('rifle') ||
+            lowerName.includes('pistol') || lowerName.includes('ammo')) {
+          itemType = 'weapon';
+        } else if (lowerName.includes('cyberware') || lowerName.includes('implant') || 
+                   lowerName.includes('augment') || lowerName.includes('mod')) {
+          itemType = 'cyberware';
+        } else if (lowerName.includes('medkit') || lowerName.includes('stim') || 
+                   lowerName.includes('heal') || lowerName.includes('food') || 
+                   lowerName.includes('drink') || lowerName.includes('consumable')) {
+          itemType = 'consumable';
+        } else if (lowerName.includes('tool') || lowerName.includes('deck') || 
+                   lowerName.includes('device') || lowerName.includes('equipment')) {
+          itemType = 'tool';
+        }
+        
+        inventory.push({
+          name: itemName,
+          description: `Acquired: ${storyContext.substring(0, 100)}`,
+          quantity: 1,
+          type: itemType
+        });
+      }
+    } else if (change.startsWith('-')) {
+      // Remove item
+      const itemName = change.substring(1).trim();
+      const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === itemName.toLowerCase());
+      
+      if (existingIndex >= 0) {
+        if (inventory[existingIndex].quantity > 1) {
+          inventory[existingIndex].quantity -= 1;
+        } else {
+          inventory.splice(existingIndex, 1);
+        }
+      }
+    }
+  }
+  
+  return inventory;
+}
+
+/**
+ * Apply story response changes to character (health, money, inventory)
+ */
+async function applyStoryChanges(
+  characterId: string,
+  character: Character,
+  storyResponse: StoryResponse
+): Promise<Character> {
+  let newHealth = character.health || 100;
+  let newMoney = character.money || 500;
+  let newInventory = [...(character.inventory || [])];
+  let newStatus = character.status;
+  
+  // Apply health change
+  if (storyResponse.healthChange !== undefined) {
+    newHealth = Math.max(0, Math.min(character.maxHealth || 100, newHealth + storyResponse.healthChange));
+    
+    // Check for death
+    if (newHealth <= 0) {
+      newStatus = 'dead';
+      console.log(`Character ${characterId} has died (health reached 0)`);
+    }
+  }
+  
+  // Apply money change
+  if (storyResponse.moneyChange !== undefined) {
+    newMoney = Math.max(0, newMoney + storyResponse.moneyChange);
+  }
+  
+  // Process inventory changes
+  if (storyResponse.inventoryChanges && storyResponse.inventoryChanges.length > 0) {
+    newInventory = processInventoryChanges(character, storyResponse.inventoryChanges, storyResponse.scenario);
+  }
+  
+  // Update character in database
+  await runInsert(
+    `UPDATE characters SET health = ?, money = ?, inventory = ?, status = ? WHERE id = ?`,
+    [newHealth, newMoney, JSON.stringify(newInventory), newStatus, characterId]
+  );
+  
+  // Return updated character
+  return {
+    ...character,
+    health: newHealth,
+    money: newMoney,
+    inventory: newInventory,
+    status: newStatus
+  };
+}
+
 // Get initial story scenario for a character
 router.post('/:characterId/scenario', async (req, res) => {
   try {
@@ -254,69 +370,29 @@ router.post('/:characterId/action', async (req, res) => {
 
     character.storyHistory.push(storyEvent);
 
-    // Apply health changes
-    if (storyResponse.healthChange !== undefined) {
-      character.health = Math.max(0, Math.min(character.maxHealth, character.health + storyResponse.healthChange));
-      
-      // Check if character died
-      if (character.health <= 0) {
-        character.status = 'dead';
-        character.health = 0;
-      }
-    }
-
-    // Apply money changes
-    if (storyResponse.moneyChange !== undefined) {
-      character.money = Math.max(0, character.money + storyResponse.moneyChange);
-    }
-
-    // Apply inventory changes
-    if (storyResponse.inventoryChanges && storyResponse.inventoryChanges.length > 0) {
-      let inventory = [...character.inventory];
-      for (const change of storyResponse.inventoryChanges) {
-        if (change.startsWith('+')) {
-          const itemName = change.substring(1).trim();
-          const existingItem = inventory.find(item => item.name === itemName);
-          if (existingItem) {
-            existingItem.quantity += 1;
-          } else {
-            inventory.push({ name: itemName, type: 'misc', quantity: 1, description: '' });
-          }
-        } else if (change.startsWith('-')) {
-          const itemName = change.substring(1).trim();
-          const index = inventory.findIndex(item => item.name === itemName);
-          if (index !== -1) {
-            inventory[index].quantity -= 1;
-            if (inventory[index].quantity <= 0) {
-              inventory.splice(index, 1);
-            }
-          }
-        }
-      }
-      character.inventory = inventory;
-    }
-
-    // Update database with all changes
+    // Apply health, money, and inventory changes
+    const updatedCharacter = await applyStoryChanges(characterId, character, storyResponse);
+    
+    // Update character state and history
     await runInsert(
       'UPDATE characters SET current_story_state = ?, story_history = ?, health = ?, money = ?, inventory = ?, status = ? WHERE id = ?',
       [
-        JSON.stringify(character.currentStoryState),
-        JSON.stringify(character.storyHistory),
-        character.health,
-        character.money,
-        JSON.stringify(character.inventory),
-        character.status,
+        JSON.stringify(updatedCharacter.currentStoryState),
+        JSON.stringify(updatedCharacter.storyHistory),
+        updatedCharacter.health,
+        updatedCharacter.money,
+        JSON.stringify(updatedCharacter.inventory),
+        updatedCharacter.status,
         characterId
       ]
     );
 
-    // Include updated character stats in response
+    // Include updated stats in response
     const responseWithStats = {
       ...storyResponse,
-      characterHealth: character.health,
-      characterMaxHealth: character.maxHealth,
-      characterMoney: character.money,
-      characterStatus: character.status
+      characterHealth: updatedCharacter.health,
+      characterMoney: updatedCharacter.money,
+      characterStatus: updatedCharacter.status
     };
 
     res.json(responseWithStats);
@@ -443,16 +519,47 @@ router.post('/:characterId/combat', async (req, res) => {
 
     character.storyHistory.push(storyEvent);
 
+    // Calculate damage based on combat outcome and injuries
+    // AI decides damage through characterStatus and injuries
+    let healthChange = 0;
+    if (combatResolution.characterStatus === 'dead') {
+      healthChange = -character.health; // Kill character
+    } else if (combatResolution.characterStatus === 'injured') {
+      // Calculate damage based on injuries (AI decides)
+      const injuryCount = combatResolution.characterInjuries?.length || 0;
+      healthChange = -(10 + (injuryCount * 5)); // Base 10 damage + 5 per injury
+    } else if (combatResolution.outcome === 'defeat') {
+      healthChange = -20; // Significant damage on defeat
+    } else if (combatResolution.outcome === 'victory') {
+      healthChange = -5; // Minor damage even on victory
+    } else {
+      healthChange = -10; // Default damage
+    }
+    
+    // Apply health change
+    let newHealth = Math.max(0, character.health + healthChange);
+    let newStatus = character.status;
+    
+    if (newHealth <= 0 || combatResolution.characterStatus === 'dead') {
+      newHealth = 0;
+      newStatus = 'dead';
+      console.log(`Character ${characterId} has died from combat`);
+    }
+    
+    // Update character
     await runInsert(
-      'UPDATE characters SET story_history = ? WHERE id = ?',
-      [JSON.stringify(character.storyHistory), characterId]
+      'UPDATE characters SET story_history = ?, health = ?, status = ? WHERE id = ?',
+      [JSON.stringify(character.storyHistory), newHealth, newStatus, characterId]
     );
 
-    // Add image to combat resolution response
+    // Add image and stats to combat resolution response
     const responseWithImage = {
       ...combatResolution,
       imageUrl: imageData?.imageUrl,
-      imagePrompt: imageData?.imagePrompt
+      imagePrompt: imageData?.imagePrompt,
+      healthChange: healthChange,
+      characterHealth: newHealth,
+      characterStatus: newStatus
     };
 
     res.json(responseWithImage);

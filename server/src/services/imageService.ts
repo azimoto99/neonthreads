@@ -4,10 +4,10 @@ import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using Replicate API with Google Imagen-4
-const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
-// Imagen-4 model on Replicate - using the model identifier
-const IMAGEN_MODEL = 'google/imagen-4';
+// Using AI Horde (Stable Horde) API
+const AI_HORDE_API_URL = 'https://stablehorde.net/api/v2';
+// Default model for anime-style images - can be changed via env variable
+const DEFAULT_MODEL = process.env.AI_HORDE_MODEL || 'Deliberate';
 
 export class ImageService {
   /**
@@ -27,9 +27,25 @@ export class ImageService {
       consequences?: string[];
     }
   ): string {
+    // Extract all character creation context
     const characterVisual = character.appearance;
     const augmentations = character.augmentations;
+    const background = character.background;
+    const trade = character.trade;
     const location = character.currentStoryState.currentScene.replace(/_/g, ' ');
+    
+    // Extract clothing items from inventory
+    const clothingItems = (character.inventory || [])
+      .filter(item => item.type === 'misc' || item.name.toLowerCase().includes('cloth') || 
+                      item.name.toLowerCase().includes('outfit') || 
+                      item.name.toLowerCase().includes('armor') ||
+                      item.name.toLowerCase().includes('jacket') ||
+                      item.name.toLowerCase().includes('shirt') ||
+                      item.name.toLowerCase().includes('pants'))
+      .map(item => item.name)
+      .join(', ');
+    
+    const clothingDescription = clothingItems ? `wearing: ${clothingItems}, ` : '';
 
     // Start with strong visual emphasis - ABSOLUTELY NO TEXT
     let basePrompt = `Anime style cyberpunk comic book illustration, `;
@@ -43,37 +59,48 @@ export class ImageService {
     }
 
     basePrompt += `anime art style, detailed anime character design, `;
+    
+    // Include full character creation context
+    basePrompt += `character background context: ${background.substring(0, 150)}, `;
+    basePrompt += `character trade/skills: ${trade}, `;
     basePrompt += `character appearance: ${characterVisual}, `;
+    basePrompt += `${clothingDescription}`;
     basePrompt += `cyberware and augmentations: ${augmentations}, `;
     basePrompt += `location setting: ${location}, `;
 
-    // ONLY use visual descriptions - focus on the single panel being generated
+    // Include the full story scenario context
+    const scenarioVisual = scenario
+      .substring(0, 300)
+      .replace(/dialogue|speech|text|narration|caption/gi, '')
+      .replace(/["']/g, ' ')
+      .trim();
+    basePrompt += `story context: ${scenarioVisual}, `;
+
+    // Use panel visual description if available (most detailed)
     if (storyContext?.panels && storyContext.panels.length > 0) {
-      // Use ONLY the visual description from the panel being generated
-      const panel = storyContext.panels[0]; // Should only be one panel
-      // Clean the visual description to remove any text references
+      const panel = storyContext.panels[0];
       let visualDesc = panel.visualDescription
         .replace(/dialogue|speech|text|narration|caption/gi, '')
-        .replace(/["']/g, '')
+        .replace(/["']/g, ' ')
         .trim();
       
-      basePrompt += `visual scene composition: ${visualDesc}, `;
-    } else {
-      // Fallback to scenario text, but clean it
-      const scenarioVisual = scenario
-        .substring(0, 200)
-        .replace(/[^\w\s]/g, ' ')
-        .replace(/dialogue|speech|text|narration|caption/gi, '')
-        .trim();
-      basePrompt += `visual scene elements: ${scenarioVisual}, `;
+      basePrompt += `detailed visual scene composition: ${visualDesc}, `;
     }
 
-    // Add visual context from outcome/consequences, but keep it visual
+    // Add visual context from outcome/consequences
     if (storyContext?.outcome) {
       const visualOutcome = storyContext.outcome
         .replace(/dialogue|speech|text|narration|caption/gi, '')
-        .substring(0, 100);
+        .substring(0, 150);
       basePrompt += `visual outcome context: ${visualOutcome}, `;
+    }
+    
+    if (storyContext?.consequences && storyContext.consequences.length > 0) {
+      const visualConsequences = storyContext.consequences
+        .join(', ')
+        .replace(/dialogue|speech|text|narration|caption/gi, '')
+        .substring(0, 150);
+      basePrompt += `visual consequences: ${visualConsequences}, `;
     }
 
     // Emphasize visual style and composition
@@ -82,6 +109,8 @@ export class ImageService {
     basePrompt += `detailed background, atmospheric lighting, `;
     basePrompt += `high quality anime artwork, professional anime illustration, `;
     basePrompt += `comic book panel style, `;
+    basePrompt += `character must match their background and trade, `;
+    basePrompt += `scene must reflect the story context accurately, `;
     basePrompt += `absolutely no text, no speech bubbles, no captions, no dialogue, no words, `;
     basePrompt += `pure visual storytelling, `;
     basePrompt += `illustration only, no text elements whatsoever`;
@@ -90,7 +119,7 @@ export class ImageService {
   }
 
   /**
-   * Generate a comic panel image using Google Imagen-4 via Replicate
+   * Generate a comic panel image using AI Horde (Stable Horde)
    */
   static async generateComicPanel(
     character: Character,
@@ -108,112 +137,154 @@ export class ImageService {
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      const replicateApiKey = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY;
+      const apiKey = process.env.AI_HORDE_API_KEY;
       
-      if (!replicateApiKey) {
-        console.warn('REPLICATE_API_TOKEN not set. Skipping image generation.');
-        return null;
+      // AI Horde API key is optional but recommended for priority
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'apikey': apiKey || '0000000000' // Anonymous key if not provided
+      };
+      
+      if (apiKey) {
+        headers['apikey'] = apiKey;
       }
       
-      console.log('Generating image with Imagen-4, prompt:', imagePrompt.substring(0, 100) + '...');
+      console.log('Generating image with AI Horde, prompt:', imagePrompt.substring(0, 100) + '...');
       
-      // Create prediction with Imagen-4
-      const createResponse = await fetch(REPLICATE_API_URL, {
+      // Create async generation request
+      const createResponse = await fetch(`${AI_HORDE_API_URL}/generate/async`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${replicateApiKey}`
-        },
+        headers,
         body: JSON.stringify({
-          version: IMAGEN_MODEL, // Replicate uses version field
-          input: {
-            prompt: imagePrompt,
-            aspect_ratio: '1:1',
-            output_format: 'png',
-            safety_filter_level: 'block_only_high'
-          }
+          prompt: imagePrompt,
+          params: {
+            n: 1, // Number of images
+            width: 512,
+            height: 512,
+            steps: 30,
+            cfg_scale: 7.5,
+            sampler_name: 'k_euler_a',
+            karras: true,
+            post_processing: ['GFPGAN'] // Optional face enhancement
+          },
+          models: [DEFAULT_MODEL],
+          nsfw: false,
+          trusted_workers: false,
+          censor_nsfw: true
         })
       });
 
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
-        console.error('Replicate API error creating prediction:', createResponse.status, errorText);
+        console.error('AI Horde API error creating request:', createResponse.status, errorText);
         return null;
       }
 
-      const prediction: any = await createResponse.json();
-      const predictionId = prediction.id;
+      const requestData: any = await createResponse.json();
+      const requestId = requestData.id;
       
-      if (!predictionId) {
-        console.error('No prediction ID returned from Replicate');
+      if (!requestId) {
+        console.error('No request ID returned from AI Horde');
         return null;
       }
       
-      console.log('Prediction created, ID:', predictionId);
+      console.log('Request created, ID:', requestId);
       
       // Poll for completion
-      let result = null;
+      let isDone = false;
       let attempts = 0;
-      const maxAttempts = 60; // 60 seconds max wait
+      const maxAttempts = 120; // 120 seconds max wait (AI Horde can be slower)
       
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      while (!isDone && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
         
-        const statusResponse = await fetch(`${REPLICATE_API_URL}/${predictionId}`, {
-          headers: {
-            'Authorization': `Token ${replicateApiKey}`
-          }
+        const checkResponse = await fetch(`${AI_HORDE_API_URL}/generate/check/${requestId}`, {
+          headers: apiKey ? { 'apikey': apiKey } : {}
         });
         
-        if (!statusResponse.ok) {
-          console.error('Error checking prediction status:', statusResponse.status);
+        if (!checkResponse.ok) {
+          console.error('Error checking request status:', checkResponse.status);
           break;
         }
         
-        const status: any = await statusResponse.json();
+        const status: any = await checkResponse.json();
         
-        if (status.status === 'succeeded') {
-          result = status.output;
+        if (status.done === true) {
+          isDone = true;
           console.log('Image generation succeeded!');
           break;
-        } else if (status.status === 'failed') {
-          console.error('Image generation failed:', status.error);
-          return null;
-        } else if (status.status === 'canceled') {
-          console.error('Image generation was canceled');
+        } else if (status.faulted === true) {
+          console.error('Image generation failed:', status.error_message);
           return null;
         }
         
         attempts++;
         if (attempts % 10 === 0) {
-          console.log(`Still generating... (${attempts}s)`);
+          console.log(`Still generating... (${attempts * 2}s)`);
         }
       }
       
-      // Handle both array and single URL response formats
-      const fetchedImageUrl = Array.isArray(result) ? result[0] : result;
-      
-      if (!fetchedImageUrl) {
-        console.error('Image generation timed out or failed - no URL returned');
+      if (!isDone) {
+        console.error('Image generation timed out');
         return null;
       }
 
-      // Fetch the image and convert to base64
-      console.log('Fetching image from:', fetchedImageUrl);
-      const imageResponse = await fetch(fetchedImageUrl);
+      // Get the generated image
+      const statusResponse = await fetch(`${AI_HORDE_API_URL}/generate/status/${requestId}`, {
+        headers: apiKey ? { 'apikey': apiKey } : {}
+      });
       
-      if (!imageResponse.ok) {
-        console.error('Error fetching generated image:', imageResponse.status);
+      if (!statusResponse.ok) {
+        console.error('Error fetching generation status:', statusResponse.status);
         return null;
       }
       
-      const imageBlob = await imageResponse.blob();
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64 = buffer.toString('base64');
-      const imageUrl = `data:image/png;base64,${base64}`;
+      const statusData: any = await statusResponse.json();
+      
+      if (!statusData.generations || statusData.generations.length === 0) {
+        console.error('No generations returned from AI Horde');
+        return null;
+      }
+      
+      // AI Horde returns base64 encoded images or URLs
+      const generation = statusData.generations[0];
+      
+      if (!generation) {
+        console.error('No generation data in response');
+        return null;
+      }
 
-      console.log('Image generated successfully!');
+      // Check if image is a URL or base64
+      // AI Horde can return either a URL or base64 string
+      let imageUrl: string;
+      const imageData = generation.img || generation.url || generation.image;
+      
+      if (!imageData) {
+        console.error('No image data in generation response');
+        console.error('Generation keys:', Object.keys(generation));
+        console.error('Generation data:', JSON.stringify(generation, null, 2));
+        return null;
+      }
+      
+      const trimmedData = String(imageData).trim();
+      
+      // Check if it's a URL first (most common case with AI Horde)
+      if (trimmedData.startsWith('http://') || trimmedData.startsWith('https://')) {
+        // It's a URL - use it directly
+        imageUrl = trimmedData;
+        console.log('Image is a URL:', imageUrl.substring(0, 100));
+      } else if (trimmedData.startsWith('data:')) {
+        // Already has data URL prefix
+        imageUrl = trimmedData;
+        console.log('Image is already a data URL');
+      } else {
+        // Assume it's base64 - clean and add data URL prefix
+        const cleanBase64 = trimmedData.replace(/\s/g, '');
+        imageUrl = `data:image/png;base64,${cleanBase64}`;
+        console.log('Image is base64, length:', cleanBase64.length);
+      }
+
+      console.log('Image generated successfully! Type:', imageUrl.startsWith('data:') ? 'base64' : 'url');
       return {
         imageUrl,
         imagePrompt
@@ -226,41 +297,89 @@ export class ImageService {
   }
 
   /**
-   * Generate a character portrait for consistency using Google Imagen-4
+   * Generate a hash of character appearance + inventory for change detection
+   */
+  static getAppearanceHash(character: Character): string {
+    const crypto = require('crypto');
+    // Include appearance, augmentations, and clothing items from inventory
+    const clothingItems = (character.inventory || [])
+      .filter(item => item.type === 'misc' || item.name.toLowerCase().includes('cloth') || 
+                      item.name.toLowerCase().includes('outfit') || 
+                      item.name.toLowerCase().includes('armor') ||
+                      item.name.toLowerCase().includes('jacket') ||
+                      item.name.toLowerCase().includes('shirt') ||
+                      item.name.toLowerCase().includes('pants'))
+      .map(item => item.name)
+      .sort()
+      .join(',');
+    
+    const hashInput = `${character.appearance}|${character.augmentations}|${clothingItems}`;
+    return crypto.createHash('md5').update(hashInput).digest('hex');
+  }
+
+  /**
+   * Generate a character portrait for consistency using AI Horde
    */
   static async generateCharacterPortrait(character: Character): Promise<string | null> {
     try {
+      // Extract clothing items from inventory
+      const clothingItems = (character.inventory || [])
+        .filter(item => item.type === 'misc' || item.name.toLowerCase().includes('cloth') || 
+                        item.name.toLowerCase().includes('outfit') || 
+                        item.name.toLowerCase().includes('armor') ||
+                        item.name.toLowerCase().includes('jacket') ||
+                        item.name.toLowerCase().includes('shirt') ||
+                        item.name.toLowerCase().includes('pants'))
+        .map(item => item.name)
+        .join(', ');
+      
+      const clothingDescription = clothingItems 
+        ? `wearing: ${clothingItems}, ` 
+        : '';
+      
       const prompt = `Anime style cyberpunk character portrait illustration, 
       visual illustration only, no text blocks, 
       anime art style, detailed anime character design, 
       character appearance: ${character.appearance}, 
+      ${clothingDescription}
       cyberware and augmentations: ${character.augmentations}, 
       background: neon-lit cyberpunk cityscape, 
       anime shading and highlights, cel-shaded style, 
       vibrant neon colors, high quality anime artwork, 
       professional anime illustration, front view, detailed character design, 
+      character must match the exact appearance description, 
       pure visual artwork, no dialogue, no text, illustration only`;
 
-      const replicateApiKey = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY;
+      const apiKey = process.env.AI_HORDE_API_KEY;
       
-      if (!replicateApiKey) {
-        return null;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'apikey': apiKey || '0000000000'
+      };
+      
+      if (apiKey) {
+        headers['apikey'] = apiKey;
       }
 
-      const createResponse = await fetch(REPLICATE_API_URL, {
+      const createResponse = await fetch(`${AI_HORDE_API_URL}/generate/async`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${replicateApiKey}`
-        },
+        headers,
         body: JSON.stringify({
-          version: IMAGEN_MODEL, // Replicate uses version field
-          input: {
-            prompt: prompt,
-            aspect_ratio: '1:1',
-            output_format: 'png',
-            safety_filter_level: 'block_only_high'
-          }
+          prompt: prompt,
+          params: {
+            n: 1,
+            width: 512,
+            height: 512,
+            steps: 30,
+            cfg_scale: 7.5,
+            sampler_name: 'k_euler_a',
+            karras: true,
+            post_processing: ['GFPGAN']
+          },
+          models: [DEFAULT_MODEL],
+          nsfw: false,
+          trusted_workers: false,
+          censor_nsfw: true
         })
       });
 
@@ -268,61 +387,86 @@ export class ImageService {
         return null;
       }
 
-      const prediction: any = await createResponse.json();
-      const predictionId = prediction.id;
+      const requestData: any = await createResponse.json();
+      const requestId = requestData.id;
       
-      if (!predictionId) {
+      if (!requestId) {
         return null;
       }
       
       // Poll for completion
-      let result = null;
+      let isDone = false;
       let attempts = 0;
       
-      while (attempts < 60) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const statusResponse = await fetch(`${REPLICATE_API_URL}/${predictionId}`, {
-          headers: {
-            'Authorization': `Token ${replicateApiKey}`
-          }
+      while (!isDone && attempts < 120) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const checkResponse = await fetch(`${AI_HORDE_API_URL}/generate/check/${requestId}`, {
+          headers: apiKey ? { 'apikey': apiKey } : {}
         });
         
-        if (!statusResponse.ok) {
+        if (!checkResponse.ok) {
           break;
         }
         
-        const status: any = await statusResponse.json();
+        const status: any = await checkResponse.json();
         
-        if (status.status === 'succeeded') {
-          result = status.output;
+        if (status.done === true) {
+          isDone = true;
           break;
-        } else if (status.status === 'failed' || status.status === 'canceled') {
+        } else if (status.faulted === true) {
           return null;
         }
         attempts++;
       }
       
-      // Handle both array and single URL response formats
-      const fetchedImageUrl = Array.isArray(result) ? result[0] : result;
-      
-      if (!fetchedImageUrl) {
+      if (!isDone) {
         return null;
       }
 
-      const imageResponse = await fetch(fetchedImageUrl);
-      if (!imageResponse.ok) {
+      const statusResponse = await fetch(`${AI_HORDE_API_URL}/generate/status/${requestId}`, {
+        headers: apiKey ? { 'apikey': apiKey } : {}
+      });
+      
+      if (!statusResponse.ok) {
         return null;
       }
       
-      const imageBlob = await imageResponse.blob();
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64 = buffer.toString('base64');
-      return `data:image/png;base64,${base64}`;
+      const statusData: any = await statusResponse.json();
+      
+      if (!statusData.generations || statusData.generations.length === 0) {
+        return null;
+      }
+      
+      const generation = statusData.generations[0];
+      
+      if (!generation) {
+        return null;
+      }
+
+      // Check if image is a URL or base64
+      const imageData = generation.img || generation.url || generation.image;
+      
+      if (!imageData) {
+        return null;
+      }
+      
+      const trimmedData = String(imageData).trim();
+      
+      // Check if it's a URL first
+      if (trimmedData.startsWith('http://') || trimmedData.startsWith('https://')) {
+        return trimmedData;
+      } else if (trimmedData.startsWith('data:')) {
+        return trimmedData;
+      } else {
+        // Assume base64
+        const cleanBase64 = trimmedData.replace(/\s/g, '');
+        return `data:image/png;base64,${cleanBase64}`;
+      }
     } catch (error) {
       console.error('Error generating character portrait:', error);
       return null;
     }
   }
 }
+
 

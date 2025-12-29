@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import './GameInterface.css';
 import ComicBook from './ComicBook';
 import ComicPanel from './ComicPanel';
+import BodySilhouette from './BodySilhouette';
+import LocationIndicator from './LocationIndicator';
 import { Character, StoryResponse, CombatResolution } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
@@ -11,15 +13,13 @@ interface GameInterfaceProps {
   playerId: string;
   onCharacterDeath: () => void;
   onNewCharacter: () => void;
-  onCharacterUpdate?: (character: Character) => void;
 }
 
 const GameInterface: React.FC<GameInterfaceProps> = ({ 
   character, 
   playerId, 
   onCharacterDeath,
-  onNewCharacter,
-  onCharacterUpdate
+  onNewCharacter 
 }) => {
   const [currentStory, setCurrentStory] = useState<StoryResponse | null>(null);
   const [playerAction, setPlayerAction] = useState('');
@@ -28,6 +28,14 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
   const [combatMode, setCombatMode] = useState(false);
   const [combatTactics, setCombatTactics] = useState('');
   const [storyHistory, setStoryHistory] = useState(character.storyHistory);
+  const [characterPortrait, setCharacterPortrait] = useState<string | null>(null);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [currentCharacter, setCurrentCharacter] = useState<Character>(character);
+  
+  // Update local character state when prop changes
+  useEffect(() => {
+    setCurrentCharacter(character);
+  }, [character]);
 
   useEffect(() => {
     // Load initial story scenario if character has no story history
@@ -44,8 +52,35 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         imageUrl: lastEvent.imageUrl
       });
     }
+    // Load character portrait if available
+    loadCharacterPortrait();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character.id]);
+  }, [character.id, character.appearance, character.inventory]);
+
+  const loadCharacterPortrait = async () => {
+    try {
+      console.log('Loading character portrait for:', character.id);
+      const response = await fetch(`${API_BASE_URL}/characters/${character.id}/portrait`);
+      
+      if (!response.ok) {
+        console.warn('Failed to load character portrait:', response.status);
+        setCharacterPortrait(null);
+        return;
+      }
+
+      const data = await response.json();
+      if (data.portraitUrl) {
+        console.log('Character portrait loaded successfully');
+        setCharacterPortrait(data.portraitUrl);
+      } else {
+        console.warn('No portrait URL in response');
+        setCharacterPortrait(null);
+      }
+    } catch (error) {
+      console.error('Error loading character portrait:', error);
+      setCharacterPortrait(null);
+    }
+  };
 
   const loadStoryScenario = async () => {
     setLoading(true);
@@ -102,24 +137,28 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
       setCurrentStory(storyResponse);
       setPlayerAction('');
 
-      // Update character to reflect health/money/inventory changes
-      const updatedCharacter = await fetchCharacter();
-      if (updatedCharacter) {
-        setStoryHistory(updatedCharacter.storyHistory);
-        
-        // Update parent component with new character data (for health bar update)
-        if (onCharacterUpdate) {
-          onCharacterUpdate(updatedCharacter);
+        // Always fetch updated character to get new health/money/inventory
+        const updatedCharacter = await fetchCharacter();
+        if (updatedCharacter) {
+          setCurrentCharacter(updatedCharacter);
+          setStoryHistory(updatedCharacter.storyHistory);
+          // Update character state - this will trigger re-render with new health/money
+          // Check if inventory or appearance changed and regenerate portrait
+          const inventoryChanged = JSON.stringify(updatedCharacter.inventory) !== JSON.stringify(currentCharacter.inventory);
+          const appearanceChanged = updatedCharacter.appearance !== currentCharacter.appearance;
+          if (inventoryChanged || appearanceChanged) {
+            console.log('Character appearance or inventory changed, regenerating portrait');
+            loadCharacterPortrait();
+          }
+          
+          // Check for death
+          if (updatedCharacter.status === 'dead' || (updatedCharacter.health !== undefined && updatedCharacter.health <= 0)) {
+            setTimeout(() => {
+              alert('Your character has died. The streets of Night City are unforgiving.');
+              onCharacterDeath();
+            }, 2000);
+          }
         }
-        
-        // Check if character died (from health reaching 0)
-        if (updatedCharacter.status === 'dead' || (updatedCharacter.health !== undefined && updatedCharacter.health <= 0)) {
-          setTimeout(() => {
-            alert('Your character has died. The streets of Night City are unforgiving.');
-            onCharacterDeath();
-          }, 2000);
-        }
-      }
 
       // If combat is initiated, enter combat mode
       if (storyResponse.combat) {
@@ -170,29 +209,27 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
       setCombatMode(false);
       setCombatTactics('');
 
-      // Check if character died
-      if (combatResolution.characterStatus === 'dead') {
+      // Always fetch updated character to get new health/money/inventory
+      const updatedCharacter = await fetchCharacter();
+      if (updatedCharacter) {
+        setCurrentCharacter(updatedCharacter);
+        setStoryHistory(updatedCharacter.storyHistory);
+        // Check if inventory or appearance changed and regenerate portrait
+        const inventoryChanged = JSON.stringify(updatedCharacter.inventory) !== JSON.stringify(currentCharacter.inventory);
+        const appearanceChanged = updatedCharacter.appearance !== currentCharacter.appearance;
+        if (inventoryChanged || appearanceChanged) {
+          console.log('Character appearance or inventory changed after combat, regenerating portrait');
+          loadCharacterPortrait();
+        }
+      }
+
+      // Check if character died (from combat resolution or health reaching 0)
+      if (combatResolution.characterStatus === 'dead' || 
+          (updatedCharacter && (updatedCharacter.status === 'dead' || (updatedCharacter.health !== undefined && updatedCharacter.health <= 0)))) {
         setTimeout(() => {
           alert('Your character has died. The streets of Night City are unforgiving.');
           onCharacterDeath();
         }, 2000);
-      } else {
-        // Update story history and character
-        const updatedCharacter = await fetchCharacter();
-        if (updatedCharacter) {
-          setStoryHistory(updatedCharacter.storyHistory);
-          if (onCharacterUpdate) {
-            onCharacterUpdate(updatedCharacter);
-          }
-          
-          // Check if character died
-          if (updatedCharacter.status === 'dead' || (updatedCharacter.health !== undefined && updatedCharacter.health <= 0)) {
-            setTimeout(() => {
-              alert('Your character has died. The streets of Night City are unforgiving.');
-              onCharacterDeath();
-            }, 2000);
-          }
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resolve combat');
@@ -213,6 +250,29 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     return null;
   };
 
+  // Extract injuries from story history or character state
+  const getInjuries = (): string[] => {
+    const injuries: string[] = [];
+    // Check recent story events for injuries
+    const recentEvents = currentCharacter.storyHistory.slice(-5);
+    recentEvents.forEach(event => {
+      if (event.consequences) {
+        event.consequences.forEach(consequence => {
+          if (consequence.toLowerCase().includes('injured') || 
+              consequence.toLowerCase().includes('damage') ||
+              consequence.toLowerCase().includes('wound')) {
+            injuries.push(consequence);
+          }
+        });
+      }
+    });
+    return injuries.slice(0, 3); // Limit to 3 most recent
+  };
+
+  // Calculate mental state and stress (placeholder logic - can be enhanced)
+  const mentalState = Math.max(0, Math.min(100, (currentCharacter.health || 100) + 20));
+  const stressLevel = Math.max(0, Math.min(100, 100 - (currentCharacter.health || 100)));
+
   return (
     <div className="game-interface">
       <div className="game-header">
@@ -222,74 +282,121 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         </button>
       </div>
 
-      <div className="game-layout">
-        <div className="character-sidebar">
-          <h2>Character</h2>
-          <div className="character-info">
+      <div className="game-grid-layout">
+        {/* Top Left: Location Indicator */}
+        <div className="grid-location">
+          <LocationIndicator 
+            location={character.currentStoryState.location}
+            scene={character.currentStoryState.currentScene}
+          />
+        </div>
+
+        {/* Top Middle: Scene Image */}
+        <div className="grid-scene-image">
+          {loading && !currentStory ? (
+            <div className="scene-image-placeholder">
+              <div className="loading-text">Generating scene...</div>
+            </div>
+          ) : currentStory?.imageUrl ? (
+            <div className="scene-image-container">
+              <img 
+                src={currentStory.imageUrl} 
+                alt="Current scene" 
+                className="scene-image"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  console.error('Scene image failed to load:', currentStory.imageUrl?.substring(0, 100));
+                  target.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('Scene image loaded successfully');
+                }}
+              />
+            </div>
+          ) : (
+            <div className="scene-image-placeholder">
+              <div className="placeholder-text">No scene image</div>
+            </div>
+          )}
+        </div>
+
+        {/* Top Right: Character Portrait */}
+        <div className="grid-character-portrait">
+          <div className="character-portrait-container">
+            {characterPortrait ? (
+              <img 
+                src={characterPortrait} 
+                alt="Character portrait" 
+                className="character-portrait-image"
+              />
+            ) : (
+              <div className="character-portrait-placeholder">
+                <div className="portrait-icon">👤</div>
+                <div className="portrait-text">{character.appearance.substring(0, 30)}...</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Under Portrait: HP Bar and Inventory */}
+        <div className="grid-character-stats">
+          <div className="character-stats-container">
             <div className="info-section">
               <h3>Health</h3>
               <div className="health-bar-container">
-                <div className="health-bar" style={{ width: `${Math.max(0, Math.min(100, ((character.health ?? 100) / (character.maxHealth ?? 100)) * 100))}%` }}>
-                  <span className="health-text">{character.health ?? 100}/{character.maxHealth ?? 100}</span>
+                <div className="health-bar" style={{ width: `${Math.max(0, Math.min(100, ((currentCharacter.health || 100) / (currentCharacter.maxHealth || 100)) * 100))}%` }}>
+                  <span className="health-text">{currentCharacter.health || 100}/{currentCharacter.maxHealth || 100}</span>
                 </div>
               </div>
             </div>
             <div className="info-section">
               <h3>Money</h3>
-              <p className="money-display">{(character.money || 500).toLocaleString()} eddies</p>
+              <p className="money-display">{(currentCharacter.money || 500).toLocaleString()} eddies</p>
             </div>
-            <div className="info-section">
-              <h3>Status</h3>
-              <p className={`status ${character.status}`}>{character.status.toUpperCase()}</p>
-            </div>
-            <div className="info-section">
-              <h3>Location</h3>
-              <p>{character.currentStoryState.currentScene.replace(/_/g, ' ')}</p>
-            </div>
-            <div className="info-section">
-              <h3>Inventory</h3>
-              <div className="inventory-list">
-                {character.inventory && character.inventory.length > 0 ? (
-                  character.inventory.map((item, index) => (
-                    <div key={index} className="inventory-item">
-                      <span className="item-name">{item.name}</span>
-                      {item.quantity > 1 && <span className="item-quantity">x{item.quantity}</span>}
-                      <span className="item-type">{item.type}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="empty-inventory">Empty</p>
+            <div className="info-section inventory-section">
+              <button 
+                className="inventory-button"
+                onClick={() => setInventoryOpen(!inventoryOpen)}
+                title={inventoryOpen ? "Close inventory" : "Open inventory"}
+              >
+                <span className="inventory-icon">🎒</span>
+                <span className="inventory-button-text">Inventory</span>
+                {currentCharacter.inventory && currentCharacter.inventory.length > 0 && (
+                  <span className="inventory-count">{currentCharacter.inventory.length}</span>
                 )}
-              </div>
+              </button>
+              {inventoryOpen && (
+                <div className="inventory-list">
+                  {currentCharacter.inventory && currentCharacter.inventory.length > 0 ? (
+                    currentCharacter.inventory.map((item, index) => (
+                      <div key={index} className="inventory-item">
+                        <span className="item-name">{item.name}</span>
+                        {item.quantity > 1 && <span className="item-quantity">x{item.quantity}</span>}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty-inventory">Empty</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="story-panel">
-          <div className="story-content">
-            {loading && !currentStory ? (
-              <ComicPanel 
-                text="Generating your story..." 
-                loading={true}
-              />
-            ) : currentStory ? (
-              <>
-                {currentStory.panels && currentStory.panels.length > 0 ? (
-                  <ComicBook 
-                    panels={currentStory.panels}
-                    loading={loading}
-                  />
-                ) : (
-                  <ComicPanel
-                    imageUrl={currentStory.imageUrl}
-                    text={currentStory.scenario}
-                    type={currentStory.combat ? 'combat' : 'story'}
-                    loading={loading && !currentStory.imageUrl}
-                  />
-                )}
-                {currentStory.outcome && (
-                  <div className={`outcome ${currentStory.success === false ? 'failure' : currentStory.success === true ? 'success' : ''}`}>
-                    <div>
+        {/* Middle Bottom: Story Text (Scrollable) */}
+        <div className="grid-story-text">
+          <div className="story-text-container">
+            <div className="story-text-header">
+              <h3>Story</h3>
+            </div>
+            <div className="story-text-content">
+              {loading && !currentStory ? (
+                <div className="story-loading">Generating your story...</div>
+              ) : currentStory ? (
+                <>
+                  <div className="story-scenario">{currentStory.scenario}</div>
+                  {currentStory.outcome && (
+                    <div className={`story-outcome ${currentStory.success === false ? 'failure' : currentStory.success === true ? 'success' : ''}`}>
                       <strong>Outcome:</strong> {currentStory.outcome}
                       {currentStory.success !== undefined && (
                         <span className={`result-badge ${currentStory.success ? 'success' : 'failure'}`}>
@@ -297,104 +404,102 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
                         </span>
                       )}
                     </div>
-                  </div>
-                )}
-                {currentStory.consequences && currentStory.consequences.length > 0 && (
-                  <div className="consequences">
-                    <strong>Consequences:</strong>
-                    <ul>
-                      {currentStory.consequences.map((consequence, i) => (
-                        <li key={i}>{consequence}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {(currentStory.healthChange || currentStory.moneyChange) && (
-                  <div className="stat-changes">
-                    {currentStory.healthChange && (
-                      <span className={`stat-change ${currentStory.healthChange < 0 ? 'negative' : 'positive'}`}>
-                        Health: {currentStory.healthChange > 0 ? '+' : ''}{currentStory.healthChange}
-                      </span>
-                    )}
-                    {currentStory.moneyChange && (
-                      <span className={`stat-change ${currentStory.moneyChange < 0 ? 'negative' : 'positive'}`}>
-                        Money: {currentStory.moneyChange > 0 ? '+' : ''}{currentStory.moneyChange} eddies
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {currentStory.combat && combatMode && (
-                  <div className="combat-section">
-                    <h3>⚔️ COMBAT</h3>
-                    <div className="combat-info">
-                      <p><strong>Opponent:</strong> {currentStory.combat.opponent}</p>
-                      <p><strong>Environment:</strong> {currentStory.combat.environment}</p>
+                  )}
+                  {currentStory.consequences && currentStory.consequences.length > 0 && (
+                    <div className="story-consequences">
+                      <strong>Consequences:</strong>
+                      <ul>
+                        {currentStory.consequences.map((consequence, i) => (
+                          <li key={i}>{consequence}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(currentStory.healthChange || currentStory.moneyChange) && (
+                    <div className="stat-changes">
+                      {currentStory.healthChange && (
+                        <span className={`stat-change ${currentStory.healthChange < 0 ? 'negative' : 'positive'}`}>
+                          Health: {currentStory.healthChange > 0 ? '+' : ''}{currentStory.healthChange}
+                        </span>
+                      )}
+                      {currentStory.moneyChange && (
+                        <span className={`stat-change ${currentStory.moneyChange < 0 ? 'negative' : 'positive'}`}>
+                          Money: {currentStory.moneyChange > 0 ? '+' : ''}{currentStory.moneyChange} eddies
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {currentStory.combat && combatMode && (
+                    <div className="combat-info-inline">
+                      <p><strong>⚔️ COMBAT:</strong> {currentStory.combat.opponent} - {currentStory.combat.environment}</p>
                       <p><strong>Stakes:</strong> {currentStory.combat.stakes}</p>
                     </div>
-                    <form onSubmit={handleCombatSubmit} className="combat-form">
-                      <textarea
-                        value={combatTactics}
-                        onChange={(e) => setCombatTactics(e.target.value)}
-                        placeholder="Describe your combat tactics..."
-                        rows={4}
-                        className="action-input"
-                        disabled={loading}
-                      />
-                      <button type="submit" className="btn-action" disabled={loading || !combatTactics.trim()}>
-                        {loading ? 'Resolving...' : 'Execute Tactics'}
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                {!combatMode && currentStory.requiresInput !== false && (
-                  <form onSubmit={handleActionSubmit} className="action-form">
-                    <textarea
-                      value={playerAction}
-                      onChange={(e) => setPlayerAction(e.target.value)}
-                      placeholder="What do you do?"
-                      rows={4}
-                      className="action-input"
-                      disabled={loading}
-                    />
-                    <button type="submit" className="btn-action" disabled={loading || !playerAction.trim()}>
-                      {loading ? 'Processing...' : 'Act'}
-                    </button>
-                  </form>
-                )}
-              </>
-            ) : (
-              <div className="no-story">No story available. Loading...</div>
-            )}
-
-            {error && <div className="error-message">{error}</div>}
-          </div>
-
-          <div className="story-history">
-            <h3>Story History</h3>
-            <div className="history-list">
-              {storyHistory.slice().reverse().map((event, index) => (
-                <div key={event.id || index} className="history-item">
-                  <div className="history-type">{event.type.toUpperCase()}</div>
-                  {event.imageUrl && (
-                    <img 
-                      src={event.imageUrl} 
-                      alt="Story panel" 
-                      className="history-image"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
                   )}
-                  <div className="history-description">{event.description.substring(0, 150)}...</div>
-                  {event.playerInput && (
-                    <div className="history-input">You: {event.playerInput}</div>
-                  )}
-                </div>
-              ))}
+                </>
+              ) : (
+                <div className="no-story">No story available. Loading...</div>
+              )}
+              {error && <div className="error-message">{error}</div>}
             </div>
           </div>
+        </div>
+
+        {/* Bottom Middle: Chat Input Box */}
+        <div className="grid-chat-input">
+          <div className="chat-input-container">
+            {currentStory?.combat && combatMode ? (
+              <form onSubmit={handleCombatSubmit} className="chat-form">
+                <textarea
+                  value={combatTactics}
+                  onChange={(e) => setCombatTactics(e.target.value)}
+                  placeholder="Describe your combat tactics..."
+                  rows={3}
+                  className="chat-input"
+                  disabled={loading}
+                />
+                <button type="submit" className="btn-chat-submit" disabled={loading || !combatTactics.trim()}>
+                  {loading ? 'Resolving...' : 'Execute'}
+                </button>
+              </form>
+            ) : !combatMode && currentStory?.requiresInput ? (
+              <form onSubmit={handleActionSubmit} className="chat-form">
+                <textarea
+                  value={playerAction}
+                  onChange={(e) => setPlayerAction(e.target.value)}
+                  placeholder="What do you do?"
+                  rows={3}
+                  className="chat-input"
+                  disabled={loading}
+                />
+                <button type="submit" className="btn-chat-submit" disabled={loading || !playerAction.trim()}>
+                  {loading ? 'Processing...' : 'Act'}
+                </button>
+              </form>
+            ) : (
+              <div className="chat-input-disabled">
+                <textarea
+                  placeholder="Waiting for story..."
+                  rows={3}
+                  className="chat-input"
+                  disabled={true}
+                />
+                <button className="btn-chat-submit" disabled={true}>
+                  Act
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Right: Body Silhouette */}
+        <div className="grid-body-silhouette">
+            <BodySilhouette
+            health={currentCharacter.health || 100}
+            maxHealth={currentCharacter.maxHealth || 100}
+            mentalState={mentalState}
+            stressLevel={stressLevel}
+            injuries={getInjuries()}
+          />
         </div>
       </div>
     </div>

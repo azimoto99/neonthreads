@@ -205,11 +205,23 @@ CRITICAL: Evaluate this action REALISTICALLY and CHALLENGINGLY:
 7. Death is possible - characters can die from bad decisions
 8. Realistic limitations - can't use items you don't have
 
-Evaluate difficulty:
-- EASY (80% success): Actions matching character's trade/skills
-- MEDIUM (50% success): Risky actions, combat, hacking
-- HARD (20% success): Nearly impossible actions, fighting groups
-- IMPOSSIBLE (0% success): Actions requiring items/money you don't have
+Evaluate difficulty and consequences:
+- EASY (80% success): Actions matching character's trade/skills - minor damage (5-10) if fails
+- MEDIUM (50% success): Risky actions, combat, hacking - moderate damage (10-25) if fails
+- HARD (20% success): Nearly impossible actions, fighting groups - severe damage (25-40) if fails
+- IMPOSSIBLE (0% success): Actions requiring items/money you don't have - critical damage (40-50) or death
+
+Damage calculation:
+- Base damage from failed actions: 5-50 based on difficulty
+- Combat damage: 10-40 based on opponent strength and outcome
+- Environmental hazards: 5-30 based on danger level
+- Healing: 5-20 from medical items or rest
+
+Money (eddies) changes:
+- Small transactions: 50-200 eddies
+- Medium transactions: 200-500 eddies
+- Large transactions: 500-1000 eddies
+- Always count eddies properly - track all gains and losses
 
 Format your response as JSON:
 {
@@ -220,9 +232,9 @@ Format your response as JSON:
   "requiresInput": true/false,
   "nextScene": "scene identifier",
   "consequences": ["consequence1", "consequence2"],
-  "healthChange": -10 to 10 (negative = damage, positive = healing),
-  "moneyChange": -100 to 100 (negative = lost, positive = gained),
-  "inventoryChanges": ["+item name" or "-item name"],
+  "healthChange": -50 to 20 (negative = damage, positive = healing, AI decides based on severity),
+  "moneyChange": -500 to 1000 (negative = lost, positive = gained, in eddies),
+  "inventoryChanges": ["+item name" or "-item name"] - ONLY add/remove items that make sense for the story context and character's trade/background. Items should be contextual to what happened in the scenario.
   "combat": {
     "opponent": "if combat initiated",
     "opponentDescription": "description",
@@ -246,7 +258,13 @@ IMPORTANT: Actions should fail 40-60% of the time. Be harsh but fair.`;
         outcome: response.outcome || 'Action completed',
         requiresInput: response.requiresInput !== false,
         nextScene: response.nextScene || currentScene,
-        combat: response.combat || undefined
+        combat: response.combat || undefined,
+        success: response.success,
+        difficulty: response.difficulty,
+        consequences: response.consequences || [],
+        healthChange: response.healthChange || 0,
+        moneyChange: response.moneyChange || 0,
+        inventoryChanges: response.inventoryChanges || []
       };
     } catch (error: any) {
       console.error('Error processing player action:', error);
