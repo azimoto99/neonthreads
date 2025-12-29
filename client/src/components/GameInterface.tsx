@@ -542,6 +542,13 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
           />
         </div>
       </div>
+      
+      {/* Story History Viewer Modal */}
+      <StoryHistoryViewer
+        storyHistory={character.storyHistory}
+        isOpen={storyHistoryOpen}
+        onClose={() => setStoryHistoryOpen(false)}
+      />
     </div>
   );
 };
