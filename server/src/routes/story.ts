@@ -176,28 +176,36 @@ router.post('/:characterId/scenario', async (req, res) => {
     const storyHistory = character.storyHistory.map(e => e.description);
     const storyResponse = await AIService.generateStoryScenario(character, storyHistory);
 
-    // Generate images for each panel individually
+    // Generate images for all panels concurrently
     if (storyResponse.panels && storyResponse.panels.length > 0) {
-      // Generate image for the first panel only (to start)
-      // We'll generate others on-demand or sequentially
       try {
-        const firstPanel = storyResponse.panels[0];
-        const imageData = await ImageService.generateComicPanel(
-          character, 
-          storyResponse.scenario, 
-          'story',
-          {
-            panels: [firstPanel], // Only pass the single panel
-            outcome: storyResponse.outcome,
-            consequences: storyResponse.consequences
+        // Generate all panel images concurrently
+        const imagePromises = storyResponse.panels.map(async (panel, index) => {
+          try {
+            const imageData = await ImageService.generateComicPanel(
+              character, 
+              storyResponse.scenario, 
+              'story',
+              {
+                panels: [panel], // Pass individual panel
+                outcome: storyResponse.outcome,
+                consequences: storyResponse.consequences
+              }
+            );
+            if (imageData && storyResponse.panels[index]) {
+              storyResponse.panels[index].imageUrl = imageData.imageUrl;
+              storyResponse.panels[index].imagePrompt = imageData.imagePrompt;
+            }
+          } catch (error) {
+            console.error(`Image generation failed for panel ${index}, continuing without image:`, error);
           }
-        );
-        if (imageData && storyResponse.panels[0]) {
-          storyResponse.panels[0].imageUrl = imageData.imageUrl;
-          storyResponse.panels[0].imagePrompt = imageData.imagePrompt;
-        }
+        });
+        
+        // Wait for all images to generate concurrently
+        await Promise.all(imagePromises);
       } catch (error) {
-        console.error('Image generation failed for first panel, continuing without image:', error);
+        console.error('Error generating panel images:', error);
+        // Continue without images if generation fails
       }
     }
 
@@ -320,27 +328,37 @@ router.post('/:characterId/action', async (req, res) => {
       storyHistory
     );
 
-    // Generate image for the first panel only
+    // Generate images for all panels concurrently
     if (storyResponse.panels && storyResponse.panels.length > 0) {
       try {
-        const firstPanel = storyResponse.panels[0];
         const imageType = storyResponse.combat ? 'combat' : 'outcome';
-        const imageData = await ImageService.generateComicPanel(
-          character, 
-          storyResponse.scenario, 
-          imageType,
-          {
-            panels: [firstPanel], // Only pass the single panel
-            outcome: storyResponse.outcome,
-            consequences: storyResponse.consequences
+        // Generate all panel images concurrently
+        const imagePromises = storyResponse.panels.map(async (panel, index) => {
+          try {
+            const imageData = await ImageService.generateComicPanel(
+              character, 
+              storyResponse.scenario, 
+              imageType,
+              {
+                panels: [panel], // Pass individual panel
+                outcome: storyResponse.outcome,
+                consequences: storyResponse.consequences
+              }
+            );
+            if (imageData && storyResponse.panels[index]) {
+              storyResponse.panels[index].imageUrl = imageData.imageUrl;
+              storyResponse.panels[index].imagePrompt = imageData.imagePrompt;
+            }
+          } catch (error) {
+            console.error(`Image generation failed for panel ${index}, continuing without image:`, error);
           }
-        );
-        if (imageData && storyResponse.panels[0]) {
-          storyResponse.panels[0].imageUrl = imageData.imageUrl;
-          storyResponse.panels[0].imagePrompt = imageData.imagePrompt;
-        }
+        });
+        
+        // Wait for all images to generate concurrently
+        await Promise.all(imagePromises);
       } catch (error) {
-        console.error('Image generation failed for first panel, continuing without image:', error);
+        console.error('Error generating panel images:', error);
+        // Continue without images if generation fails
       }
     }
 

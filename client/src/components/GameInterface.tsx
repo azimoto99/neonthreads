@@ -286,7 +286,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
             <div className="scene-image-container">
               <img 
                 src={currentStory.imageUrl} 
-                alt="Current scene" 
+                alt="Current scene"
+                loading="lazy" 
                 className="scene-image"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -313,6 +314,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
                 src={characterPortrait} 
                 alt="Character portrait" 
                 className="character-portrait-image"
+                loading="lazy"
               />
             ) : (
               <div className="character-portrait-placeholder">

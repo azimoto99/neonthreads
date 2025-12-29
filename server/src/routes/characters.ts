@@ -255,35 +255,30 @@ router.get('/:id/portrait', async (req, res) => {
     // Check if we have a stored portrait hash (we'll store it in story_state for now)
     const storedHash = character.currentStoryState.portraitHash;
     
-    // Regenerate if forced, hash changed, or no hash exists
-    if (forceRegenerate || !storedHash || storedHash !== currentHash) {
-      console.log('Generating character portrait for:', character.id, forceRegenerate ? '(forced)' : '(appearance changed)');
+    // Check if we have a cached portrait URL
+    const cachedPortraitUrl = row.portrait_url;
+    
+    // Regenerate if forced, hash changed, no hash exists, or no cached URL
+    if (forceRegenerate || !storedHash || storedHash !== currentHash || !cachedPortraitUrl) {
+      console.log('Generating character portrait for:', character.id, forceRegenerate ? '(forced)' : storedHash !== currentHash ? '(appearance changed)' : '(no cache)');
       const portraitUrl = await ImageService.generateCharacterPortrait(character);
 
       if (!portraitUrl) {
         return res.status(500).json({ error: 'Failed to generate character portrait' });
       }
 
-      // Update portrait hash in story state
+      // Update portrait hash and URL
       character.currentStoryState.portraitHash = currentHash;
-      await runInsert(
-        'UPDATE characters SET current_story_state = ? WHERE id = ?',
-        [JSON.stringify(character.currentStoryState), id]
+      await runUpdate(
+        'UPDATE characters SET current_story_state = ?, portrait_url = ? WHERE id = ?',
+        [JSON.stringify(character.currentStoryState), portraitUrl, id]
       );
 
       res.json({ portraitUrl, hash: currentHash });
     } else {
-      // Portrait is still valid, but we need to return it
-      // For now, we'll regenerate anyway since we don't store the URL
-      // In a production system, you'd store the portrait URL in the database
-      console.log('Portrait hash unchanged, regenerating anyway (URL not stored)');
-      const portraitUrl = await ImageService.generateCharacterPortrait(character);
-      
-      if (!portraitUrl) {
-        return res.status(500).json({ error: 'Failed to generate character portrait' });
-      }
-      
-      res.json({ portraitUrl, hash: currentHash });
+      // Portrait is cached and still valid - return cached URL
+      console.log('Returning cached portrait for:', character.id);
+      res.json({ portraitUrl: cachedPortraitUrl, hash: currentHash });
     }
   } catch (error) {
     console.error('Error generating character portrait:', error);

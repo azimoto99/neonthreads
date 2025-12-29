@@ -41,6 +41,7 @@ const ComicPanel: React.FC<ComicPanelProps> = ({
               src={imageUrl} 
               alt="Comic panel" 
               className="comic-panel-image"
+              loading="lazy"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 console.error('Image failed to load:', imageUrl?.substring(0, 100));

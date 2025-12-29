@@ -137,9 +137,15 @@ export async function initDatabase(): Promise<void> {
         inventory JSONB NOT NULL DEFAULT '[]',
         money INTEGER NOT NULL DEFAULT 500,
         health INTEGER NOT NULL DEFAULT 100,
-        max_health INTEGER NOT NULL DEFAULT 100
+        max_health INTEGER NOT NULL DEFAULT 100,
+        portrait_url TEXT
       )
     `);
+    
+    // Add portrait_url column if it doesn't exist (migration)
+    await pgPool.query(`
+      ALTER TABLE characters ADD COLUMN IF NOT EXISTS portrait_url TEXT
+    `).catch(() => {}); // Ignore error if column already exists
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS story_events (
@@ -202,6 +208,7 @@ export async function initDatabase(): Promise<void> {
           money INTEGER NOT NULL DEFAULT 500,
           health INTEGER NOT NULL DEFAULT 100,
           max_health INTEGER NOT NULL DEFAULT 100,
+          portrait_url TEXT,
           FOREIGN KEY (player_id) REFERENCES users(id)
         )
       `, (err) => {
@@ -215,6 +222,7 @@ export async function initDatabase(): Promise<void> {
         sqliteDb!.run(`ALTER TABLE characters ADD COLUMN money INTEGER DEFAULT 500`, () => {});
         sqliteDb!.run(`ALTER TABLE characters ADD COLUMN health INTEGER DEFAULT 100`, () => {});
         sqliteDb!.run(`ALTER TABLE characters ADD COLUMN max_health INTEGER DEFAULT 100`, () => {});
+        sqliteDb!.run(`ALTER TABLE characters ADD COLUMN portrait_url TEXT`, () => {});
       });
 
       // Story events table
