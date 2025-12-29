@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Character, StoryResponse, CombatResolution, StoryState } from '../types';
@@ -6,66 +7,52 @@ import { Character, StoryResponse, CombatResolution, StoryState } from '../types
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 export class AIService {
-  private static readonly OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-  private static readonly MODEL = 'xiaomi/mimo-v2-flash:free'; // Free model through OpenRouter
+  private static readonly MODEL = 'gemini-1.5-flash'; // or 'gemini-1.5-pro' for better quality
   private static readonly MAX_TOKENS = 2048;
 
   /**
-   * Make a request to OpenRouter API
+   * Get Gemini AI instance
    */
-  private static async callOpenRouter(messages: Array<{ role: string; content: string }>): Promise<string> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+  private static getGeminiAI(): GoogleGenerativeAI {
+    const apiKey = process.env.GEMINI_API_KEY;
     
-    if (!apiKey || apiKey === 'your_openrouter_api_key_here') {
-      throw new Error('OPENROUTER_API_KEY is not set or is still using placeholder value. Please add your actual OpenRouter API key to server/.env');
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      throw new Error('GEMINI_API_KEY is not set or is still using placeholder value. Please add your actual Gemini API key to server/.env');
     }
     
-    // Validate API key format
-    if (!apiKey.startsWith('sk-or-') && !apiKey.startsWith('sk-')) {
-      console.warn('⚠️  OpenRouter API key format may be incorrect. Should start with "sk-or-"');
-    }
+    return new GoogleGenerativeAI(apiKey);
+  }
 
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-      'X-Title': 'Neon Threads'
-    };
-
-    const response = await fetch(this.OPENROUTER_API_URL, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
+  /**
+   * Make a request to Gemini API
+   */
+  private static async callGemini(prompt: string): Promise<string> {
+    try {
+      const genAI = this.getGeminiAI();
+      const model = genAI.getGenerativeModel({ 
         model: this.MODEL,
-        messages: messages,
-        max_tokens: this.MAX_TOKENS,
-        temperature: 0.8
-      })
-    });
-
-    if (!response.ok) {
-      const errorData: any = await response.json().catch(() => ({ error: 'Unknown error' }));
-      const errorMessage = errorData.error?.message || errorData.message || errorData.error || `HTTP ${response.status}`;
-      
-      // Log more details for debugging
-      console.error('OpenRouter API Error Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData,
-        model: this.MODEL,
-        apiKeyPrefix: apiKey ? apiKey.substring(0, 10) + '...' : 'NOT SET'
+        generationConfig: {
+          maxOutputTokens: this.MAX_TOKENS,
+          temperature: 0.8,
+        }
       });
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error: any) {
+      console.error('Gemini API Error:', error);
       
-      // Check for specific authentication errors
-      if (response.status === 401 || errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('credential') || errorMessage.toLowerCase().includes('cookie')) {
-        throw new Error(`OpenRouter authentication failed. Please verify your API key is correct and starts with "sk-or-". Error: ${errorMessage}`);
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        throw new Error('Gemini API authentication failed. Please check your GEMINI_API_KEY in server/.env');
       }
       
-      throw new Error(`OpenRouter API error: ${errorMessage}`);
+      if (error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+        throw new Error('Gemini API rate limit exceeded. Please try again later.');
+      }
+      
+      throw new Error(`Gemini API error: ${error?.message || 'Unknown error'}`);
     }
-
-    const data: any = await response.json();
-    return data.choices[0]?.message?.content || '';
   }
 
   /**
@@ -116,9 +103,7 @@ Each panel should:
 Make it immersive and cinematic!`;
 
     try {
-      const content = await this.callOpenRouter([
-        { role: 'user', content: prompt }
-      ]);
+      const content = await this.callGemini(prompt);
 
       const response = this.parseJSONResponse(content);
       
@@ -139,19 +124,14 @@ Make it immersive and cinematic!`;
       console.error('Error generating story scenario:', error);
       
       // Provide more specific error messages
-      if (error?.message?.includes('authentication') || error?.message?.includes('401')) {
-        console.error('❌ OpenRouter API authentication failed. Check your OPENROUTER_API_KEY in server/.env');
-        throw new Error('API authentication failed. Please check your OpenRouter API key.');
+      if (error?.message?.includes('authentication') || error?.message?.includes('API_KEY')) {
+        console.error('❌ Gemini API authentication failed. Check your GEMINI_API_KEY in server/.env');
+        throw new Error('API authentication failed. Please check your Gemini API key.');
       }
       
-      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
-        console.error('❌ OpenRouter API rate limit exceeded');
+      if (error?.message?.includes('rate limit') || error?.message?.includes('quota')) {
+        console.error('❌ Gemini API rate limit exceeded');
         throw new Error('API rate limit exceeded. Please try again later.');
-      }
-      
-      if (error?.message?.includes('credit') || error?.message?.includes('balance')) {
-        console.error('❌ OpenRouter API: Insufficient credits. Please add credits to your OpenRouter account.');
-        throw new Error('Insufficient API credits. Please add credits to your OpenRouter account at https://openrouter.ai/');
       }
       
       // Return fallback story but log the error
@@ -246,10 +226,7 @@ Format your response as JSON:
 IMPORTANT: Actions should fail 40-60% of the time. Be harsh but fair.`;
 
     try {
-      const content = await this.callOpenRouter([
-        { role: 'user', content: prompt }
-      ]);
-
+      const content = await this.callGemini(prompt);
       const response = this.parseJSONResponse(content);
       const scenario = response.scenario || 'Your action has consequences...';
       return {
@@ -269,12 +246,12 @@ IMPORTANT: Actions should fail 40-60% of the time. Be harsh but fair.`;
     } catch (error: any) {
       console.error('Error processing player action:', error);
       
-      if (error?.message?.includes('authentication') || error?.message?.includes('401')) {
-        throw new Error('API authentication failed. Please check your OpenRouter API key.');
+      if (error?.message?.includes('authentication') || error?.message?.includes('API_KEY')) {
+        throw new Error('API authentication failed. Please check your Gemini API key.');
       }
       
-      if (error?.message?.includes('credit') || error?.message?.includes('balance')) {
-        throw new Error('Insufficient API credits. Please add credits to your OpenRouter account.');
+      if (error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+        throw new Error('API rate limit exceeded. Please try again later.');
       }
       
       const fallbackScenario = 'Your action ripples through the neon-soaked world. The consequences unfold...';
@@ -328,10 +305,7 @@ Format your response as JSON:
 Be fair but dramatic. Death should feel earned, not arbitrary.`;
 
     try {
-      const content = await this.callOpenRouter([
-        { role: 'user', content: prompt }
-      ]);
-
+      const content = await this.callGemini(prompt);
       const response = this.parseJSONResponse(content);
       return {
         outcome: response.outcome || 'victory',
@@ -343,8 +317,8 @@ Be fair but dramatic. Death should feel earned, not arbitrary.`;
     } catch (error: any) {
       console.error('Error resolving combat:', error);
       
-      if (error?.message?.includes('authentication') || error?.message?.includes('401')) {
-        throw new Error('API authentication failed. Please check your OpenRouter API key.');
+      if (error?.message?.includes('authentication') || error?.message?.includes('API_KEY')) {
+        throw new Error('API authentication failed. Please check your Gemini API key.');
       }
       
       return {
@@ -421,11 +395,11 @@ Full Description: ${character.fullDescription}`;
 }
 
 // Validate API key on startup
-if (!process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY === 'your_openrouter_api_key_here') {
-  console.warn('⚠️  WARNING: OPENROUTER_API_KEY is not set or is using placeholder value!');
-  console.warn('⚠️  Story generation will fail. Please set OPENROUTER_API_KEY in server/.env');
-  console.warn('⚠️  Get your API key from: https://openrouter.ai/keys');
+if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+  console.warn('⚠️  WARNING: GEMINI_API_KEY is not set or is using placeholder value!');
+  console.warn('⚠️  Story generation will fail. Please set GEMINI_API_KEY in server/.env');
+  console.warn('⚠️  Get your API key from: https://aistudio.google.com/app/apikey');
 } else {
-  console.log('✅ OpenRouter API key loaded');
+  console.log('✅ Gemini API key loaded');
 }
 

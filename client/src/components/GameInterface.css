@@ -365,6 +365,11 @@
 .story-text-header {
   flex-shrink: 0;
   margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .story-text-header h3 {
@@ -373,8 +378,27 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border-color);
+}
+
+.btn-story-history {
+  padding: 6px 12px;
+  background: transparent;
+  border: 2px solid var(--neon-magenta);
+  color: var(--neon-magenta);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-story-history:hover {
+  background: var(--neon-magenta);
+  color: var(--bg-dark);
+  box-shadow: 0 0 10px var(--neon-magenta);
 }
 
 .story-text-content {

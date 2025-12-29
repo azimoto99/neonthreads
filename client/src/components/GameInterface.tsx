@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './GameInterface.css';
 import BodySilhouette from './BodySilhouette';
 import LocationIndicator from './LocationIndicator';
+import StoryHistoryViewer from './StoryHistoryViewer';
 import { Character, StoryResponse, CombatResolution } from '../types';
 import { authenticatedFetch } from '../utils/api';
 
@@ -27,6 +28,9 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
   const [characterPortrait, setCharacterPortrait] = useState<string | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [currentCharacter, setCurrentCharacter] = useState<Character>(character);
+  const [sceneImageLoading, setSceneImageLoading] = useState(false);
+  const [portraitLoading, setPortraitLoading] = useState(false);
+  const [storyHistoryOpen, setStoryHistoryOpen] = useState(false);
   
   // Update local character state when prop changes
   useEffect(() => {
@@ -34,7 +38,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
   }, [character]);
 
   useEffect(() => {
-    // Load initial story scenario if character has no story history
+    // STEP 1: Load story text FIRST (immediately)
     if (character.storyHistory.length === 0) {
       loadStoryScenario();
     } else {
@@ -56,12 +60,23 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         setCombatMode(true);
       }
     }
-    // Load character portrait if available
-    loadCharacterPortrait();
+    
+    // STEP 2: Load scene image after story is displayed
+    setTimeout(() => {
+      if (currentStory?.imageUrl) {
+        setSceneImageLoading(true);
+      }
+    }, 100);
+    
+    // STEP 3: Load character portrait after scene image
+    setTimeout(() => {
+      loadCharacterPortrait();
+    }, 200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [character.id]);
 
   const loadCharacterPortrait = async () => {
+    setPortraitLoading(true);
     try {
       console.log('Loading character portrait for:', character.id);
       const response = await authenticatedFetch(`/characters/${character.id}/portrait`);
@@ -83,6 +98,8 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     } catch (error) {
       console.error('Error loading character portrait:', error);
       setCharacterPortrait(null);
+    } finally {
+      setPortraitLoading(false);
     }
   };
 
@@ -101,7 +118,21 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
       }
 
       const story = await response.json();
+      // Set story text immediately (before images load)
       setCurrentStory(story);
+      
+      // Load scene image after story is displayed
+      if (story.imageUrl) {
+        setSceneImageLoading(true);
+        setTimeout(() => {
+          setSceneImageLoading(false);
+        }, 500);
+      }
+      
+      // Load portrait after scene image
+      setTimeout(() => {
+        loadCharacterPortrait();
+      }, 300);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load story';
       console.error('Story generation error:', err);
@@ -286,9 +317,9 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
 
         {/* Top Middle: Scene Image */}
         <div className="grid-scene-image">
-          {loading && !currentStory ? (
+          {sceneImageLoading ? (
             <div className="scene-image-placeholder">
-              <div className="loading-text">Generating scene...</div>
+              <div className="loading-text">Loading scene image...</div>
             </div>
           ) : currentStory?.imageUrl ? (
             <div className="scene-image-container">
@@ -304,6 +335,7 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
                 }}
                 onLoad={() => {
                   console.log('Scene image loaded successfully');
+                  setSceneImageLoading(false);
                 }}
               />
             </div>
@@ -317,7 +349,11 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
         {/* Top Right: Character Portrait */}
         <div className="grid-character-portrait">
           <div className="character-portrait-container">
-            {characterPortrait ? (
+            {portraitLoading ? (
+              <div className="character-portrait-placeholder">
+                <div className="loading-text">Loading portrait...</div>
+              </div>
+            ) : characterPortrait ? (
               <img 
                 src={characterPortrait} 
                 alt="Character portrait" 
@@ -383,6 +419,15 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
           <div className="story-text-container">
             <div className="story-text-header">
               <h3>Story</h3>
+              {character.storyHistory.length > 0 && (
+                <button 
+                  className="btn-story-history"
+                  onClick={() => setStoryHistoryOpen(true)}
+                  title="View story history"
+                >
+                  📖 History ({character.storyHistory.length})
+                </button>
+              )}
             </div>
             <div className="story-text-content">
               {loading && !currentStory ? (

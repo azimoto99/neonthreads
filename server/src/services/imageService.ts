@@ -1,13 +1,12 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using AI Horde (Stable Horde) API
-const AI_HORDE_API_URL = 'https://stablehorde.net/api/v2';
-// Default model for anime-style images - can be changed via env variable
-const DEFAULT_MODEL = process.env.AI_HORDE_MODEL || 'Deliberate';
+// Using Google Imagen via Gemini API
+const IMAGEN_MODEL = 'imagen-3.0-generate-001'; // or 'imagen-3.0-fast-generate-001' for faster generation
 
 export class ImageService {
   /**
@@ -119,7 +118,20 @@ export class ImageService {
   }
 
   /**
-   * Generate a comic panel image using AI Horde (Stable Horde)
+   * Get Gemini AI instance for Imagen
+   */
+  private static getGeminiAI(): GoogleGenerativeAI {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      throw new Error('GEMINI_API_KEY is not set or is still using placeholder value. Please add your actual Gemini API key to server/.env');
+    }
+    
+    return new GoogleGenerativeAI(apiKey);
+  }
+
+  /**
+   * Generate a comic panel image using Google Imagen via Gemini API
    */
   static async generateComicPanel(
     character: Character,
@@ -137,160 +149,67 @@ export class ImageService {
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      const apiKey = process.env.AI_HORDE_API_KEY;
+      console.log('Generating image with Imagen, prompt:', imagePrompt.substring(0, 100) + '...');
       
-      // AI Horde API key is optional but recommended for priority
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'apikey': apiKey || '0000000000' // Anonymous key if not provided
-      };
+      const genAI = this.getGeminiAI();
       
-      if (apiKey) {
-        headers['apikey'] = apiKey;
-      }
-      
-      console.log('Generating image with AI Horde, prompt:', imagePrompt.substring(0, 100) + '...');
-      
-      // Create async generation request
-      const createResponse = await fetch(`${AI_HORDE_API_URL}/generate/async`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          prompt: imagePrompt,
-          params: {
-            n: 1, // Number of images
-            width: 512,
-            height: 512,
-            steps: 30,
-            cfg_scale: 7.5,
-            sampler_name: 'k_euler_a',
-            karras: true,
-            post_processing: ['GFPGAN'] // Optional face enhancement
+      // Use Imagen through the Generative AI API
+      // Note: Imagen is accessed via the REST API endpoint
+      const apiKey = process.env.GEMINI_API_KEY;
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          models: [DEFAULT_MODEL],
-          nsfw: false,
-          trusted_workers: false,
-          censor_nsfw: true
-        })
-      });
-
-      if (!createResponse.ok) {
-        const errorText = await createResponse.text();
-        console.error('AI Horde API error creating request:', createResponse.status, errorText);
-        return null;
-      }
-
-      const requestData: any = await createResponse.json();
-      const requestId = requestData.id;
-      
-      if (!requestId) {
-        console.error('No request ID returned from AI Horde');
-        return null;
-      }
-      
-      console.log('Request created, ID:', requestId);
-      
-      // Poll for completion
-      let isDone = false;
-      let attempts = 0;
-      const maxAttempts = 120; // 120 seconds max wait (AI Horde can be slower)
-      
-      while (!isDone && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
-        
-        const checkResponse = await fetch(`${AI_HORDE_API_URL}/generate/check/${requestId}`, {
-          headers: apiKey ? { 'apikey': apiKey } : {}
-        });
-        
-        if (!checkResponse.ok) {
-          console.error('Error checking request status:', checkResponse.status);
-          break;
+          body: JSON.stringify({
+            prompt: imagePrompt,
+            number_of_images: 1,
+            aspect_ratio: '1:1',
+            safety_filter_level: 'block_some',
+            person_generation: 'allow_all',
+          }),
         }
-        
-        const status: any = await checkResponse.json();
-        
-        if (status.done === true) {
-          isDone = true;
-          console.log('Image generation succeeded!');
-          break;
-        } else if (status.faulted === true) {
-          console.error('Image generation failed:', status.error_message);
-          return null;
-        }
-        
-        attempts++;
-        if (attempts % 10 === 0) {
-          console.log(`Still generating... (${attempts * 2}s)`);
-        }
-      }
-      
-      if (!isDone) {
-        console.error('Image generation timed out');
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Imagen API error:', response.status, errorData);
         return null;
       }
 
-      // Get the generated image
-      const statusResponse = await fetch(`${AI_HORDE_API_URL}/generate/status/${requestId}`, {
-        headers: apiKey ? { 'apikey': apiKey } : {}
-      });
+      const data: any = await response.json();
       
-      if (!statusResponse.ok) {
-        console.error('Error fetching generation status:', statusResponse.status);
-        return null;
-      }
-      
-      const statusData: any = await statusResponse.json();
-      
-      if (!statusData.generations || statusData.generations.length === 0) {
-        console.error('No generations returned from AI Horde');
-        return null;
-      }
-      
-      // AI Horde returns base64 encoded images or URLs
-      const generation = statusData.generations[0];
-      
-      if (!generation) {
-        console.error('No generation data in response');
+      if (!data.generatedImages || data.generatedImages.length === 0) {
+        console.error('No images returned from Imagen');
         return null;
       }
 
-      // Check if image is a URL or base64
-      // AI Horde can return either a URL or base64 string
-      let imageUrl: string;
-      const imageData = generation.img || generation.url || generation.image;
+      // Imagen returns base64 encoded images
+      const generatedImage = data.generatedImages[0];
+      const base64Image = generatedImage.base64String;
       
-      if (!imageData) {
-        console.error('No image data in generation response');
-        console.error('Generation keys:', Object.keys(generation));
-        console.error('Generation data:', JSON.stringify(generation, null, 2));
+      if (!base64Image) {
+        console.error('No base64 image data in response');
         return null;
       }
-      
-      const trimmedData = String(imageData).trim();
-      
-      // Check if it's a URL first (most common case with AI Horde)
-      if (trimmedData.startsWith('http://') || trimmedData.startsWith('https://')) {
-        // It's a URL - use it directly
-        imageUrl = trimmedData;
-        console.log('Image is a URL:', imageUrl.substring(0, 100));
-      } else if (trimmedData.startsWith('data:')) {
-        // Already has data URL prefix
-        imageUrl = trimmedData;
-        console.log('Image is already a data URL');
-      } else {
-        // Assume it's base64 - clean and add data URL prefix
-        const cleanBase64 = trimmedData.replace(/\s/g, '');
-        imageUrl = `data:image/png;base64,${cleanBase64}`;
-        console.log('Image is base64, length:', cleanBase64.length);
-      }
 
-      console.log('Image generated successfully! Type:', imageUrl.startsWith('data:') ? 'base64' : 'url');
+      // Convert base64 to data URL
+      const imageUrl = `data:image/png;base64,${base64Image}`;
+      
+      console.log('Image generated successfully with Imagen!');
       return {
         imageUrl,
         imagePrompt
       };
-    } catch (error) {
-      console.error('Error generating comic panel image:', error);
+    } catch (error: any) {
+      console.error('Error generating comic panel image with Imagen:', error);
+      
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        console.error('❌ Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
+      }
+      
       // Return null to allow story to continue without image
       return null;
     }
@@ -318,7 +237,7 @@ export class ImageService {
   }
 
   /**
-   * Generate a character portrait for consistency using AI Horde
+   * Generate a character portrait for consistency using Google Imagen
    */
   static async generateCharacterPortrait(character: Character): Promise<string | null> {
     try {
@@ -350,120 +269,60 @@ export class ImageService {
       character must match the exact appearance description, 
       pure visual artwork, no dialogue, no text, illustration only`;
 
-      const apiKey = process.env.AI_HORDE_API_KEY;
+      console.log('Generating character portrait with Imagen');
       
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'apikey': apiKey || '0000000000'
-      };
-      
-      if (apiKey) {
-        headers['apikey'] = apiKey;
-      }
-
-      const createResponse = await fetch(`${AI_HORDE_API_URL}/generate/async`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          prompt: prompt,
-          params: {
-            n: 1,
-            width: 512,
-            height: 512,
-            steps: 30,
-            cfg_scale: 7.5,
-            sampler_name: 'k_euler_a',
-            karras: true,
-            post_processing: ['GFPGAN']
+      const apiKey = process.env.GEMINI_API_KEY;
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          models: [DEFAULT_MODEL],
-          nsfw: false,
-          trusted_workers: false,
-          censor_nsfw: true
-        })
-      });
-
-      if (!createResponse.ok) {
-        return null;
-      }
-
-      const requestData: any = await createResponse.json();
-      const requestId = requestData.id;
-      
-      if (!requestId) {
-        return null;
-      }
-      
-      // Poll for completion
-      let isDone = false;
-      let attempts = 0;
-      
-      while (!isDone && attempts < 120) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const checkResponse = await fetch(`${AI_HORDE_API_URL}/generate/check/${requestId}`, {
-          headers: apiKey ? { 'apikey': apiKey } : {}
-        });
-        
-        if (!checkResponse.ok) {
-          break;
+          body: JSON.stringify({
+            prompt: prompt,
+            number_of_images: 1,
+            aspect_ratio: '1:1',
+            safety_filter_level: 'block_some',
+            person_generation: 'allow_all',
+          }),
         }
-        
-        const status: any = await checkResponse.json();
-        
-        if (status.done === true) {
-          isDone = true;
-          break;
-        } else if (status.faulted === true) {
-          return null;
-        }
-        attempts++;
-      }
-      
-      if (!isDone) {
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Imagen API error for portrait:', response.status, errorData);
         return null;
       }
 
-      const statusResponse = await fetch(`${AI_HORDE_API_URL}/generate/status/${requestId}`, {
-        headers: apiKey ? { 'apikey': apiKey } : {}
-      });
+      const data: any = await response.json();
       
-      if (!statusResponse.ok) {
-        return null;
-      }
-      
-      const statusData: any = await statusResponse.json();
-      
-      if (!statusData.generations || statusData.generations.length === 0) {
-        return null;
-      }
-      
-      const generation = statusData.generations[0];
-      
-      if (!generation) {
+      if (!data.generatedImages || data.generatedImages.length === 0) {
+        console.error('No images returned from Imagen for portrait');
         return null;
       }
 
-      // Check if image is a URL or base64
-      const imageData = generation.img || generation.url || generation.image;
+      // Imagen returns base64 encoded images
+      const generatedImage = data.generatedImages[0];
+      const base64Image = generatedImage.base64String;
       
-      if (!imageData) {
+      if (!base64Image) {
+        console.error('No base64 image data in portrait response');
         return null;
       }
+
+      // Convert base64 to data URL
+      const imageUrl = `data:image/png;base64,${base64Image}`;
       
-      const trimmedData = String(imageData).trim();
+      console.log('Character portrait generated successfully with Imagen!');
+      return imageUrl;
+    } catch (error: any) {
+      console.error('Error generating character portrait with Imagen:', error);
       
-      // Check if it's a URL first
-      if (trimmedData.startsWith('http://') || trimmedData.startsWith('https://')) {
-        return trimmedData;
-      } else if (trimmedData.startsWith('data:')) {
-        return trimmedData;
-      } else {
-        // Assume base64
-        const cleanBase64 = trimmedData.replace(/\s/g, '');
-        return `data:image/png;base64,${cleanBase64}`;
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        console.error('❌ Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
       }
-    } catch (error) {
-      console.error('Error generating character portrait:', error);
+      
       return null;
     }
   }
