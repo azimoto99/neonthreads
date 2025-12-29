@@ -5,7 +5,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: cd server && npm install --legacy-peer-deps && npx tsc && ls -la dist/ || (echo "Build failed" && exit 1)
+    buildCommand: cd server && npm install && npm run build
     startCommand: cd server && node dist/index.js
     envVars:
       - key: NODE_ENV
