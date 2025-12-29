@@ -274,8 +274,15 @@ router.get('/:id/portrait', async (req, res) => {
     
     // Regenerate if forced, hash changed, no hash exists, or no cached URL
     if (forceRegenerate || !storedHash || storedHash !== currentHash || !cachedPortraitUrl) {
-      console.log('Generating character portrait for:', character.id, forceRegenerate ? '(forced)' : storedHash !== currentHash ? '(appearance changed)' : '(no cache)');
-      const portraitUrl = await ImageService.generateCharacterPortrait(character);
+      const isAppearanceChange = storedHash && storedHash !== currentHash && cachedPortraitUrl;
+      console.log('Generating character portrait for:', character.id, 
+        forceRegenerate ? '(forced)' : isAppearanceChange ? '(appearance changed - editing)' : '(no cache - generating new)');
+      
+      // If appearance changed and we have existing portrait, edit it instead of generating new
+      const portraitUrl = await ImageService.generateCharacterPortrait(
+        character, 
+        isAppearanceChange ? cachedPortraitUrl : undefined
+      );
 
       if (!portraitUrl) {
         return res.status(500).json({ error: 'Failed to generate character portrait' });
