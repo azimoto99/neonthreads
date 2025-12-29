@@ -202,7 +202,21 @@ router.patch('/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    await runInsert(
+    // Verify character belongs to authenticated user
+    const rows = await runQuery<any[]>(
+      'SELECT * FROM characters WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    if (rows[0].player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await runUpdate(
       'UPDATE characters SET status = ? WHERE id = ?',
       [status, id]
     );

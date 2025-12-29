@@ -172,11 +172,28 @@ router.post('/:characterId/scenario', async (req, res) => {
       return res.status(400).json({ error: 'Character is dead' });
     }
 
+    // STEP 1: Ensure character portrait exists first (needed as context for scene images)
+    let characterPortraitUrl = row.portrait_url;
+    if (!characterPortraitUrl) {
+      console.log('Generating character portrait first before scene images...');
+      const portraitUrl = await ImageService.generateCharacterPortrait(character);
+      if (portraitUrl) {
+        characterPortraitUrl = portraitUrl;
+        // Save portrait to database
+        const currentHash = ImageService.getAppearanceHash(character);
+        character.currentStoryState.portraitHash = currentHash;
+        await runInsert(
+          'UPDATE characters SET current_story_state = ?, portrait_url = ? WHERE id = ?',
+          [JSON.stringify(character.currentStoryState), portraitUrl, characterId]
+        );
+      }
+    }
+
     // Generate story scenario
     const storyHistory = character.storyHistory.map(e => e.description);
     const storyResponse = await AIService.generateStoryScenario(character, storyHistory);
 
-    // Generate images for all panels concurrently
+    // STEP 2: Generate images for all panels concurrently, using portrait as context
     if (storyResponse.panels && storyResponse.panels.length > 0) {
       try {
         // Generate all panel images concurrently
@@ -190,7 +207,8 @@ router.post('/:characterId/scenario', async (req, res) => {
                 panels: [panel], // Pass individual panel
                 outcome: storyResponse.outcome,
                 consequences: storyResponse.consequences
-              }
+              },
+              characterPortraitUrl // Pass portrait as context
             );
             if (imageData && storyResponse.panels![index]) {
               storyResponse.panels![index].imageUrl = imageData.imageUrl;
@@ -212,10 +230,6 @@ router.post('/:characterId/scenario', async (req, res) => {
     // Update character's current scene
     if (storyResponse.nextScene) {
       character.currentStoryState.currentScene = storyResponse.nextScene;
-      await runInsert(
-        'UPDATE characters SET current_story_state = ? WHERE id = ?',
-        [JSON.stringify(character.currentStoryState), characterId]
-      );
     }
 
     // Record story event
@@ -253,9 +267,18 @@ router.post('/:characterId/scenario', async (req, res) => {
 
     character.storyHistory.push(storyEvent);
 
+    // Save all character data in one update
     await runInsert(
-      'UPDATE characters SET story_history = ? WHERE id = ?',
-      [JSON.stringify(character.storyHistory), characterId]
+      'UPDATE characters SET current_story_state = ?, story_history = ?, health = ?, money = ?, inventory = ?, status = ? WHERE id = ?',
+      [
+        JSON.stringify(character.currentStoryState),
+        JSON.stringify(character.storyHistory),
+        character.health || 100,
+        character.money || 500,
+        JSON.stringify(character.inventory || []),
+        character.status,
+        characterId
+      ]
     );
 
     res.json(storyResponse);
@@ -319,6 +342,9 @@ router.post('/:characterId/action', async (req, res) => {
       return res.status(400).json({ error: 'Character is dead' });
     }
 
+    // Get character portrait URL for context
+    const characterPortraitUrl = row.portrait_url;
+
     // Process action
     const storyHistory = character.storyHistory.map(e => `${e.type}: ${e.description}`);
     const storyResponse = await AIService.processPlayerAction(
@@ -328,7 +354,7 @@ router.post('/:characterId/action', async (req, res) => {
       storyHistory
     );
 
-    // Generate images for all panels concurrently
+    // Generate images for all panels concurrently, using portrait as context
     if (storyResponse.panels && storyResponse.panels.length > 0) {
       try {
         const imageType = storyResponse.combat ? 'combat' : 'outcome';
@@ -343,7 +369,8 @@ router.post('/:characterId/action', async (req, res) => {
                 panels: [panel], // Pass individual panel
                 outcome: storyResponse.outcome,
                 consequences: storyResponse.consequences
-              }
+              },
+              characterPortraitUrl // Pass portrait as context
             );
             if (imageData && storyResponse.panels![index]) {
               storyResponse.panels![index].imageUrl = imageData.imageUrl;
@@ -499,6 +526,9 @@ router.post('/:characterId/combat', async (req, res) => {
       storyHistory
     );
 
+    // Get character portrait URL for context
+    const characterPortraitUrl = row.portrait_url;
+
     // Generate comic panel image for combat outcome
     let imageData: { imageUrl: string; imagePrompt: string } | null = null;
     try {
@@ -509,7 +539,8 @@ router.post('/:characterId/combat', async (req, res) => {
         {
           outcome: combatResolution.outcome,
           consequences: combatResolution.consequences
-        }
+        },
+        characterPortraitUrl // Pass portrait as context
       );
     } catch (error) {
       console.error('Image generation failed for combat:', error);
@@ -586,10 +617,18 @@ router.post('/:characterId/combat', async (req, res) => {
       console.log(`Character ${characterId} has died from combat`);
     }
     
-    // Update character
+    // Update character with all data
     await runInsert(
-      'UPDATE characters SET story_history = ?, health = ?, status = ? WHERE id = ?',
-      [JSON.stringify(character.storyHistory), newHealth, newStatus, characterId]
+      'UPDATE characters SET story_history = ?, health = ?, money = ?, inventory = ?, status = ?, current_story_state = ? WHERE id = ?',
+      [
+        JSON.stringify(character.storyHistory),
+        newHealth,
+        character.money || 500,
+        JSON.stringify(character.inventory || []),
+        newStatus,
+        JSON.stringify(character.currentStoryState),
+        characterId
+      ]
     );
 
     // Add image and stats to combat resolution response
