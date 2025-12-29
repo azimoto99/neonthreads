@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './CharacterCreation.css';
 import { Character, CreateCharacterRequest } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 interface CharacterCreationProps {
   playerId: string;
