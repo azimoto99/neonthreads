@@ -37,6 +37,7 @@ export interface StoryState {
   activeComplications: string[];
   npcRelationships: Record<string, number>;
   worldState: Record<string, any>;
+  portraitHash?: string; // Hash of character appearance for portrait caching
 }
 
 export interface StoryEvent {
