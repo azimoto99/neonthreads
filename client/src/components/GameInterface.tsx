@@ -38,20 +38,28 @@ const GameInterface: React.FC<GameInterfaceProps> = ({
     if (character.storyHistory.length === 0) {
       loadStoryScenario();
     } else {
-      // Load the most recent story event
+      // Restore the most recent story event with full details
       const lastEvent = character.storyHistory[character.storyHistory.length - 1];
-      setCurrentStory({
+      const restoredStory: StoryResponse = {
         scenario: lastEvent.description,
         outcome: lastEvent.outcome,
-        requiresInput: true,
+        requiresInput: !lastEvent.playerInput, // If there's a player input, we might need new input
         nextScene: character.currentStoryState.currentScene,
-        imageUrl: lastEvent.imageUrl
-      });
+        imageUrl: lastEvent.imageUrl,
+        consequences: lastEvent.consequences,
+        success: lastEvent.type === 'combat' ? undefined : (lastEvent.outcome?.toLowerCase().includes('success') ? true : false)
+      };
+      setCurrentStory(restoredStory);
+      
+      // If the last event was combat, check if we're still in combat mode
+      if (lastEvent.type === 'combat') {
+        setCombatMode(true);
+      }
     }
     // Load character portrait if available
     loadCharacterPortrait();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character.id, character.appearance, character.inventory]);
+  }, [character.id]);
 
   const loadCharacterPortrait = async () => {
     try {

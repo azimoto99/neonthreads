@@ -33,21 +33,35 @@ function App() {
         const userData = await response.json();
         setUser({ id: userData.id, email: userData.email, username: userData.username });
         setIsAuthenticated(true);
+        setAuthState('authenticated');
         
         // Try to load last active character
         const lastCharacterId = localStorage.getItem('neonThreadsLastCharacter');
         if (lastCharacterId) {
-          fetchCharacter(lastCharacterId);
+          await fetchCharacter(lastCharacterId);
         }
       } else {
         // Token invalid, clear auth
         localStorage.removeItem('neonThreadsToken');
         localStorage.removeItem('neonThreadsUserId');
+        localStorage.removeItem('neonThreadsLastCharacter');
+        setUser(null);
         setIsAuthenticated(false);
+        setAuthState('login');
+        setCurrentCharacter(null);
       }
     } catch (error) {
       console.error('Error checking auth:', error);
-      setIsAuthenticated(false);
+      // Only clear auth if it's an auth error
+      if (error instanceof Error && error.message === 'Authentication required') {
+        localStorage.removeItem('neonThreadsToken');
+        localStorage.removeItem('neonThreadsUserId');
+        localStorage.removeItem('neonThreadsLastCharacter');
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthState('login');
+        setCurrentCharacter(null);
+      }
     }
   };
 
