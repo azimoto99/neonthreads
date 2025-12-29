@@ -63,9 +63,9 @@ app.listen(PORT, () => {
 });
 
 // Log API key status (without showing the key)
-if (process.env.OPENROUTER_API_KEY) {
-  console.log('✅ OpenRouter API key loaded');
+if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+  console.log('✅ Gemini API key loaded');
 } else {
-  console.warn('⚠️  OpenRouter API key NOT loaded');
+  console.warn('⚠️  Gemini API key NOT loaded');
 }
 
