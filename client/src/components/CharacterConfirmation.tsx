@@ -154,12 +154,14 @@ const CharacterConfirmation: React.FC<CharacterConfirmationProps> = ({
               <div className="stat-card">
                 <h3>Health</h3>
                 <div className="stat-value">
-                  {character.health} / {character.maxHealth}
+                  {character.health ?? 100} / {character.maxHealth ?? 100}
                 </div>
                 <div className="health-bar">
                   <div 
                     className="health-fill"
-                    style={{ width: `${(character.health / character.maxHealth) * 100}%` }}
+                    style={{ 
+                      width: `${((character.health ?? 100) / (character.maxHealth ?? 100)) * 100}%` 
+                    }}
                   />
                 </div>
               </div>

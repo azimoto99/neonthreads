@@ -118,6 +118,19 @@ function App() {
     localStorage.removeItem('neonThreadsLastCharacter');
   };
 
+  const handleDeleteCharacter = async () => {
+    if (currentCharacter) {
+      try {
+        await authenticatedFetch(`/characters/${currentCharacter.id}`, {
+          method: 'DELETE',
+        });
+        handleBackToCreation();
+      } catch (error) {
+        console.error('Error deleting character:', error);
+      }
+    }
+  };
+
   const handleCharacterDeath = () => {
     setCurrentCharacter(null);
     localStorage.removeItem('neonThreadsLastCharacter');
