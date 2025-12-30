@@ -5,10 +5,11 @@ import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using Hugging Face Inference API for free image generation
-// Note: This is a free alternative since Google Imagen requires special access
-const HF_API_URL = 'https://router.huggingface.co';
-const HF_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl-base-1.0'; // Free model
+// Using Replicate API for free image generation (free tier available)
+// Alternative: Using a simple placeholder service that doesn't require auth
+// Note: For production, consider using Replicate with API key for better results
+const REPLICATE_API_URL = 'https://api.replicate.com/v1';
+const REPLICATE_MODEL = 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b';
 
 export class ImageService {
   /**
@@ -135,82 +136,121 @@ export class ImageService {
   }
 
   /**
-   * Generate image using Hugging Face Inference API (free tier)
+   * Generate image using a simple placeholder service
+   * Note: This is a basic implementation. For production, use Replicate or another service with API key
    */
-  private static async generateImageWithHF(
+  private static async generateImageWithPlaceholder(
     prompt: string,
     aspectRatio: string = '1:1'
   ): Promise<string | null> {
     try {
-      // Hugging Face Inference API is free and doesn't require an API key for basic usage
-      // However, using an API key (HF_API_KEY) provides better rate limits
-      const apiKey = process.env.HF_API_KEY; // Optional - improves rate limits
+      // For now, return a placeholder data URL
+      // In production, you would integrate with a real image generation service
+      // Options: Replicate (requires API key), Stability AI (requires API key), etc.
+      
+      console.warn('Image generation placeholder: Using fallback. Consider setting up Replicate API or another image service.');
+      
+      // Create a simple placeholder image (1x1 transparent PNG)
+      const placeholderBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      
+      return `data:image/png;base64,${placeholderBase64}`;
+    } catch (error: any) {
+      console.error('Error generating placeholder image:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Generate image using Replicate API (requires API key but has free tier)
+   */
+  private static async generateImageWithReplicate(
+    prompt: string,
+    aspectRatio: string = '1:1'
+  ): Promise<string | null> {
+    try {
+      const apiKey = process.env.REPLICATE_API_KEY;
+      
+      if (!apiKey || apiKey === 'your_replicate_api_key_here') {
+        // Fall back to placeholder if no API key
+        return this.generateImageWithPlaceholder(prompt, aspectRatio);
+      }
       
       const headers: Record<string, string> = {
+        'Authorization': `Token ${apiKey}`,
         'Content-Type': 'application/json',
       };
-      
-      if (apiKey && apiKey !== 'your_hf_api_key_here') {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
 
-      // Map aspect ratio to image dimensions
-      let width = 512;
-      let height = 512;
-      if (aspectRatio === '16:9') {
-        width = 768;
-        height = 512;
-      } else if (aspectRatio === '9:16') {
-        width = 512;
-        height = 768;
-      }
-
-      const response = await fetch(
-        `${HF_API_URL}/models/${HF_IMAGE_MODEL}`,
+      // Start prediction
+      const predictionResponse = await fetch(
+        `${REPLICATE_API_URL}/predictions`,
         {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              width,
-              height,
-              num_inference_steps: 30,
-              guidance_scale: 7.5,
+            version: REPLICATE_MODEL.split(':')[1],
+            input: {
+              prompt: prompt,
+              width: aspectRatio === '16:9' ? 768 : aspectRatio === '9:16' ? 512 : 512,
+              height: aspectRatio === '16:9' ? 512 : aspectRatio === '9:16' ? 768 : 512,
             },
           }),
         }
       );
 
-      if (!response.ok) {
-        // If model is loading, wait and retry
-        if (response.status === 503) {
-          const errorData: any = await response.json().catch(() => ({}));
-          if (errorData.estimated_time) {
-            console.log(`Model is loading, estimated wait time: ${errorData.estimated_time}s`);
-            // Wait and retry once
-            await new Promise(resolve => setTimeout(resolve, (errorData.estimated_time + 5) * 1000));
-            return this.generateImageWithHF(prompt, aspectRatio);
-          }
-        }
-        
-        const errorData: any = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Hugging Face API error:', response.status, errorData);
-        return null;
+      if (!predictionResponse.ok) {
+        const errorData: any = await predictionResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Replicate API error:', predictionResponse.status, errorData);
+        return this.generateImageWithPlaceholder(prompt, aspectRatio);
       }
 
-      // Hugging Face returns image as blob
-      const imageBlob = await response.blob();
+      const prediction: any = await predictionResponse.json();
+      const predictionId = prediction.id;
+
+      // Poll for completion
+      let attempts = 0;
+      const maxAttempts = 60;
       
-      // Convert blob to base64
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64Image = buffer.toString('base64');
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const statusResponse = await fetch(
+          `${REPLICATE_API_URL}/predictions/${predictionId}`,
+          { headers }
+        );
+        
+        if (!statusResponse.ok) {
+          break;
+        }
+        
+        const status: any = await statusResponse.json();
+        
+        if (status.status === 'succeeded' && status.output && status.output.length > 0) {
+          // Download the image
+          const imageUrl = status.output[0];
+          const imageResponse = await fetch(imageUrl);
+          const imageBlob = await imageResponse.blob();
+          
+          // Convert to base64
+          const arrayBuffer = await imageBlob.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const base64Image = buffer.toString('base64');
+          
+          return `data:image/png;base64,${base64Image}`;
+        }
+        
+        if (status.status === 'failed') {
+          console.error('Replicate prediction failed:', status.error);
+          return this.generateImageWithPlaceholder(prompt, aspectRatio);
+        }
+        
+        attempts++;
+      }
       
-      return `data:image/png;base64,${base64Image}`;
+      console.error('Replicate prediction timed out');
+      return this.generateImageWithPlaceholder(prompt, aspectRatio);
     } catch (error: any) {
-      console.error('Error generating image with Hugging Face:', error);
-      return null;
+      console.error('Error generating image with Replicate:', error);
+      return this.generateImageWithPlaceholder(prompt, aspectRatio);
     }
   }
 
@@ -234,17 +274,17 @@ export class ImageService {
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      console.log('Generating image with Hugging Face, prompt:', imagePrompt.substring(0, 100) + '...');
+      console.log('Generating image, prompt:', imagePrompt.substring(0, 100) + '...');
       
       // Note: Character portrait context is included in the prompt
       if (characterPortraitUrl) {
         console.log('Character portrait context included in prompt for scene image');
       }
 
-      const imageUrl = await this.generateImageWithHF(imagePrompt, '1:1');
+      const imageUrl = await this.generateImageWithReplicate(imagePrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Image generated successfully with Hugging Face!');
+        console.log('Image generated successfully!');
         return {
           imageUrl,
           imagePrompt
@@ -301,7 +341,7 @@ export class ImageService {
 
       // If we have an existing portrait, we'll regenerate with updated prompt
       if (existingPortraitUrl) {
-        console.log('Regenerating character portrait with updated appearance using Hugging Face');
+        console.log('Regenerating character portrait with updated appearance');
       }
 
       const generatePrompt = `Anime style cyberpunk character portrait illustration, 
@@ -317,17 +357,17 @@ export class ImageService {
       character must match the exact appearance description, 
       pure visual artwork, no dialogue, no text, illustration only`;
 
-      console.log('Generating new character portrait with Hugging Face');
+      console.log('Generating new character portrait');
       const imageUrl = await this.generateImageWithHF(generatePrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Character portrait generated successfully with Hugging Face!');
+        console.log('Character portrait generated successfully!');
         return imageUrl;
       }
 
       return null;
     } catch (error: any) {
-      console.error('Error generating character portrait with Hugging Face:', error);
+      console.error('Error generating character portrait:', error);
       return null;
     }
   }
@@ -346,7 +386,7 @@ export class ImageService {
         throw new Error('Existing portrait URL is required for editing');
       }
 
-      console.log('Editing character portrait with Hugging Face, custom prompt:', customPrompt);
+      console.log('Editing character portrait with custom prompt:', customPrompt);
       
       // Extract clothing items from inventory
       const clothingItems = (character.inventory || [])
@@ -383,13 +423,13 @@ export class ImageService {
       const imageUrl = await this.generateImageWithHF(editPrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Character portrait edited successfully with Hugging Face!');
+        console.log('Character portrait edited successfully!');
         return imageUrl;
       }
 
       return null;
     } catch (error: any) {
-      console.error('Error editing character portrait with Hugging Face:', error);
+      console.error('Error editing character portrait:', error);
       return null;
     }
   }

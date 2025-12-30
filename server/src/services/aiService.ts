@@ -7,7 +7,7 @@ import { Character, StoryResponse, CombatResolution, StoryState } from '../types
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 export class AIService {
-  private static readonly MODEL = 'gemini-1.5-flash'; // Free tier Gemini model
+  private static readonly MODEL = 'gemini-pro'; // Free tier Gemini model (gemini-1.5-flash not available in v1beta)
   private static readonly MAX_TOKENS = 2048;
 
   /**
