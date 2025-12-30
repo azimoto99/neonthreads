@@ -3,17 +3,20 @@ import './App.css';
 import Login from './components/Login';
 import Register from './components/Register';
 import CharacterCreation from './components/CharacterCreation';
+import CharacterConfirmation from './components/CharacterConfirmation';
 import GameInterface from './components/GameInterface';
 import { Character } from './types';
 import { authenticatedFetch } from './utils/api';
 
 type AuthState = 'login' | 'register' | 'authenticated';
+type CharacterState = 'creating' | 'confirming' | 'playing';
 
 function App() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<{ id: string; email: string; username?: string } | null>(null);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
+  const [characterState, setCharacterState] = useState<CharacterState>('creating');
 
   useEffect(() => {
     // Check if user is already logged in
@@ -101,7 +104,18 @@ function App() {
 
   const handleCharacterCreated = (character: Character) => {
     setCurrentCharacter(character);
+    setCharacterState('confirming');
     localStorage.setItem('neonThreadsLastCharacter', character.id);
+  };
+
+  const handleCharacterConfirmed = () => {
+    setCharacterState('playing');
+  };
+
+  const handleBackToCreation = () => {
+    setCurrentCharacter(null);
+    setCharacterState('creating');
+    localStorage.removeItem('neonThreadsLastCharacter');
   };
 
   const handleCharacterDeath = () => {
@@ -132,8 +146,8 @@ function App() {
     );
   }
 
-  // Show character creation or game interface
-  if (!currentCharacter) {
+  // Show character creation, confirmation, or game interface
+  if (!currentCharacter || characterState === 'creating') {
     return (
       <div className="App">
         <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
@@ -152,13 +166,38 @@ function App() {
     );
   }
 
+  if (characterState === 'confirming') {
+    return (
+      <div className="App">
+        <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+          <button 
+            onClick={handleLogout}
+            className="btn btn-secondary"
+            style={{ padding: '8px 16px', fontSize: '14px' }}
+          >
+            Logout ({user?.email})
+          </button>
+        </div>
+        <CharacterConfirmation
+          character={currentCharacter}
+          onConfirm={handleCharacterConfirmed}
+          onBack={handleBackToCreation}
+          onDeleteCharacter={handleDeleteCharacter}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="App">
       <GameInterface 
         character={currentCharacter}
         playerId={user!.id}
         onCharacterDeath={handleCharacterDeath}
-        onNewCharacter={() => setCurrentCharacter(null)}
+        onNewCharacter={() => {
+          setCurrentCharacter(null);
+          setCharacterState('creating');
+        }}
       />
     </div>
   );

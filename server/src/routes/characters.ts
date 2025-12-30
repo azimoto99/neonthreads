@@ -157,6 +157,38 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Delete character
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verify character exists and belongs to user
+    const rows = await runQuery<any[]>(
+      'SELECT * FROM characters WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Delete character
+    await runQuery('DELETE FROM characters WHERE id = ?', [id]);
+    
+    res.json({ message: 'Character deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting character:', error);
+    res.status(500).json({ error: 'Failed to delete character' });
+  }
+});
+
 // Get all characters for the authenticated user
 router.get('/my-characters', async (req, res) => {
   try {
@@ -340,6 +372,84 @@ function getStartingInventory(trade: string): InventoryItem[] {
 
   return inventory;
 }
+
+// Edit character portrait with custom prompt
+router.post('/:id/portrait/edit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { prompt } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    // Fetch character
+    const rows = await runQuery<any[]>(
+      'SELECT * FROM characters WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const row = rows[0];
+    
+    // Verify character belongs to authenticated user
+    if (row.player_id !== req.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const character: Character = {
+      id: row.id,
+      playerId: row.player_id,
+      background: row.background,
+      augmentations: row.augmentations,
+      appearance: row.appearance,
+      trade: row.trade,
+      optionalPrompts: parseJsonField(row.optional_prompts),
+      fullDescription: row.full_description,
+      createdAt: row.created_at,
+      currentStoryState: parseJsonField(row.current_story_state),
+      status: row.status,
+      storyHistory: parseJsonField(row.story_history) || [],
+      inventory: parseJsonField(row.inventory) || [],
+      money: row.money || 500,
+      health: row.health || 100,
+      maxHealth: row.max_health || 100
+    };
+
+    // Get existing portrait URL
+    const existingPortraitUrl = row.portrait_url;
+    
+    if (!existingPortraitUrl) {
+      return res.status(400).json({ error: 'Character portrait not found. Please generate a portrait first.' });
+    }
+
+    // Edit the portrait with the custom prompt
+    console.log('Editing character portrait with custom prompt:', prompt);
+    const editedPortraitUrl = await ImageService.editCharacterPortrait(
+      character,
+      existingPortraitUrl,
+      prompt.trim()
+    );
+
+    if (!editedPortraitUrl) {
+      return res.status(500).json({ error: 'Failed to edit character portrait' });
+    }
+
+    // Update portrait URL in database
+    await runUpdate(
+      'UPDATE characters SET portrait_url = ? WHERE id = ?',
+      [editedPortraitUrl, id]
+    );
+
+    res.json({ portraitUrl: editedPortraitUrl });
+  } catch (error: any) {
+    console.error('Error editing character portrait:', error);
+    res.status(500).json({ error: error.message || 'Failed to edit character portrait' });
+  }
+});
 
 export { router as characterRoutes };
 

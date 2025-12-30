@@ -407,6 +407,80 @@ export class ImageService {
       return null;
     }
   }
+
+  /**
+   * Edit a character portrait with a custom prompt
+   */
+  static async editCharacterPortrait(
+    character: Character,
+    existingPortraitUrl: string,
+    customPrompt: string
+  ): Promise<string | null> {
+    try {
+      const apiKey = process.env.NANO_BANANA_API_KEY;
+      
+      if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
+        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana Pro API key to server/.env');
+      }
+
+      if (!existingPortraitUrl) {
+        throw new Error('Existing portrait URL is required for editing');
+      }
+
+      console.log('Editing character portrait with custom prompt:', customPrompt);
+      
+      // Build the edit prompt - combine custom prompt with character context
+      const editPrompt = `${customPrompt}. Keep the same character, same pose, same background style, but apply the requested changes. Maintain anime cyberpunk art style.`;
+      
+      const response = await fetch(`${NANO_BANANA_API_URL}/images/edit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: NANO_BANANA_MODEL,
+          prompt: editPrompt,
+          image_input: [existingPortraitUrl],
+          resolution: '2K',
+          aspect_ratio: '1:1',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Nano Banana Pro edit API error:', response.status, errorData);
+        return null;
+      }
+
+      const data: any = await response.json();
+      
+      if (data.task_id) {
+        const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
+        if (imageUrl) {
+          console.log('Character portrait edited successfully with Nano Banana Pro!');
+          return imageUrl;
+        }
+        return null;
+      }
+      
+      if (data.image_url || data.url) {
+        console.log('Character portrait edited successfully with Nano Banana Pro!');
+        return data.image_url || data.url;
+      }
+
+      console.error('Unexpected response format from Nano Banana Pro for portrait edit:', data);
+      return null;
+    } catch (error: any) {
+      console.error('Error editing character portrait with Nano Banana Pro:', error);
+      
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        console.error('❌ Nano Banana Pro API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
+      }
+      
+      return null;
+    }
+  }
 }
 
 
