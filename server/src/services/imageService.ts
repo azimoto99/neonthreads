@@ -185,7 +185,7 @@ export class ImageService {
       if (!response.ok) {
         // If model is loading, wait and retry
         if (response.status === 503) {
-          const errorData = await response.json().catch(() => ({}));
+          const errorData: any = await response.json().catch(() => ({}));
           if (errorData.estimated_time) {
             console.log(`Model is loading, estimated wait time: ${errorData.estimated_time}s`);
             // Wait and retry once
@@ -194,7 +194,7 @@ export class ImageService {
           }
         }
         
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorData: any = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('Hugging Face API error:', response.status, errorData);
         return null;
       }
