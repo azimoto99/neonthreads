@@ -5,8 +5,10 @@ import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using Google Imagen for image generation (free tier)
-const IMAGEN_MODEL = 'imagen-3.0-generate-001';
+// Using Hugging Face Inference API for free image generation
+// Note: This is a free alternative since Google Imagen requires special access
+const HF_API_URL = 'https://api-inference.huggingface.co/models';
+const HF_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl-base-1.0'; // Free model
 
 export class ImageService {
   /**
@@ -133,75 +135,87 @@ export class ImageService {
   }
 
   /**
-   * Generate image using Google Imagen API
+   * Generate image using Hugging Face Inference API (free tier)
    */
-  private static async generateImageWithImagen(
+  private static async generateImageWithHF(
     prompt: string,
     aspectRatio: string = '1:1'
   ): Promise<string | null> {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Hugging Face Inference API is free and doesn't require an API key for basic usage
+      // However, using an API key (HF_API_KEY) provides better rate limits
+      const apiKey = process.env.HF_API_KEY; // Optional - improves rate limits
       
-      if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-        throw new Error('GEMINI_API_KEY is not set. Please add your Gemini API key to server/.env');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (apiKey && apiKey !== 'your_hf_api_key_here') {
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
-      // Use Imagen API through Vertex AI endpoint
+      // Map aspect ratio to image dimensions
+      let width = 512;
+      let height = 512;
+      if (aspectRatio === '16:9') {
+        width = 768;
+        height = 512;
+      } else if (aspectRatio === '9:16') {
+        width = 512;
+        height = 768;
+      }
+
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
+        `${HF_API_URL}/${HF_IMAGE_MODEL}`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
-            prompt: prompt,
-            number_of_images: 1,
-            aspect_ratio: aspectRatio,
-            safety_filter_level: 'block_some',
-            person_generation: 'allow_all',
+            inputs: prompt,
+            parameters: {
+              width,
+              height,
+              num_inference_steps: 30,
+              guidance_scale: 7.5,
+            },
           }),
         }
       );
 
       if (!response.ok) {
+        // If model is loading, wait and retry
+        if (response.status === 503) {
+          const errorData = await response.json().catch(() => ({}));
+          if (errorData.estimated_time) {
+            console.log(`Model is loading, estimated wait time: ${errorData.estimated_time}s`);
+            // Wait and retry once
+            await new Promise(resolve => setTimeout(resolve, (errorData.estimated_time + 5) * 1000));
+            return this.generateImageWithHF(prompt, aspectRatio);
+          }
+        }
+        
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Imagen API error:', response.status, errorData);
+        console.error('Hugging Face API error:', response.status, errorData);
         return null;
       }
 
-      const data: any = await response.json();
+      // Hugging Face returns image as blob
+      const imageBlob = await response.blob();
       
-      // Imagen returns images in the response
-      if (data.generatedImages && data.generatedImages.length > 0) {
-        const imageData = data.generatedImages[0];
-        
-        // Imagen returns base64 encoded images
-        if (imageData.base64String) {
-          return `data:image/png;base64,${imageData.base64String}`;
-        }
-        
-        // Or it might return a URL
-        if (imageData.imageUrl || imageData.url) {
-          return imageData.imageUrl || imageData.url;
-        }
-      }
-
-      console.error('Unexpected response format from Imagen:', data);
-      return null;
+      // Convert blob to base64
+      const arrayBuffer = await imageBlob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Image = buffer.toString('base64');
+      
+      return `data:image/png;base64,${base64Image}`;
     } catch (error: any) {
-      console.error('Error generating image with Google Imagen:', error);
-      
-      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
-      }
-      
+      console.error('Error generating image with Hugging Face:', error);
       return null;
     }
   }
 
   /**
-   * Generate a comic panel image using Google Imagen
+   * Generate a comic panel image using Hugging Face (free tier)
    */
   static async generateComicPanel(
     character: Character,
@@ -216,22 +230,21 @@ export class ImageService {
       outcome?: string;
       consequences?: string[];
     },
-    characterPortraitUrl?: string // Optional: use character portrait as context (note: Imagen may not support this directly)
+    characterPortraitUrl?: string // Optional: use character portrait as context
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      console.log('Generating image with Google Imagen, prompt:', imagePrompt.substring(0, 100) + '...');
+      console.log('Generating image with Hugging Face, prompt:', imagePrompt.substring(0, 100) + '...');
       
-      // Note: Imagen doesn't directly support reference images in the same way
-      // The character portrait context is included in the prompt instead
+      // Note: Character portrait context is included in the prompt
       if (characterPortraitUrl) {
         console.log('Character portrait context included in prompt for scene image');
       }
 
-      const imageUrl = await this.generateImageWithImagen(imagePrompt, '1:1');
+      const imageUrl = await this.generateImageWithHF(imagePrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Image generated successfully with Google Imagen!');
+        console.log('Image generated successfully with Hugging Face!');
         return {
           imageUrl,
           imagePrompt
@@ -240,7 +253,7 @@ export class ImageService {
 
       return null;
     } catch (error: any) {
-      console.error('Error generating comic panel image with Google Imagen:', error);
+      console.error('Error generating comic panel image with Hugging Face:', error);
       return null;
     }
   }
@@ -267,7 +280,7 @@ export class ImageService {
   }
 
   /**
-   * Generate a character portrait using Google Imagen
+   * Generate a character portrait using Hugging Face (free tier)
    */
   static async generateCharacterPortrait(character: Character, existingPortraitUrl?: string): Promise<string | null> {
     try {
@@ -287,9 +300,8 @@ export class ImageService {
         : '';
 
       // If we have an existing portrait, we'll regenerate with updated prompt
-      // Note: Imagen doesn't have direct image editing, so we regenerate
       if (existingPortraitUrl) {
-        console.log('Regenerating character portrait with updated appearance using Google Imagen');
+        console.log('Regenerating character portrait with updated appearance using Hugging Face');
       }
 
       const generatePrompt = `Anime style cyberpunk character portrait illustration, 
@@ -305,29 +317,24 @@ export class ImageService {
       character must match the exact appearance description, 
       pure visual artwork, no dialogue, no text, illustration only`;
 
-      console.log('Generating new character portrait with Google Imagen');
-      const imageUrl = await this.generateImageWithImagen(generatePrompt, '1:1');
+      console.log('Generating new character portrait with Hugging Face');
+      const imageUrl = await this.generateImageWithHF(generatePrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Character portrait generated successfully with Google Imagen!');
+        console.log('Character portrait generated successfully with Hugging Face!');
         return imageUrl;
       }
 
       return null;
     } catch (error: any) {
-      console.error('Error generating character portrait with Google Imagen:', error);
-      
-      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
-      }
-      
+      console.error('Error generating character portrait with Hugging Face:', error);
       return null;
     }
   }
 
   /**
    * Edit a character portrait with a custom prompt
-   * Note: Imagen doesn't support direct image editing, so we regenerate with the edit prompt
+   * Note: We regenerate with the edit prompt included
    */
   static async editCharacterPortrait(
     character: Character,
@@ -339,7 +346,7 @@ export class ImageService {
         throw new Error('Existing portrait URL is required for editing');
       }
 
-      console.log('Editing character portrait with Google Imagen, custom prompt:', customPrompt);
+      console.log('Editing character portrait with Hugging Face, custom prompt:', customPrompt);
       
       // Extract clothing items from inventory
       const clothingItems = (character.inventory || [])
@@ -373,21 +380,16 @@ export class ImageService {
       pure visual artwork, no dialogue, no text, illustration only`;
 
       // Regenerate with the edit prompt
-      const imageUrl = await this.generateImageWithImagen(editPrompt, '1:1');
+      const imageUrl = await this.generateImageWithHF(editPrompt, '1:1');
 
       if (imageUrl) {
-        console.log('Character portrait edited successfully with Google Imagen!');
+        console.log('Character portrait edited successfully with Hugging Face!');
         return imageUrl;
       }
 
       return null;
     } catch (error: any) {
-      console.error('Error editing character portrait with Google Imagen:', error);
-      
-      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
-      }
-      
+      console.error('Error editing character portrait with Hugging Face:', error);
       return null;
     }
   }
