@@ -181,12 +181,12 @@ export class ImageService {
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      console.log('Generating image with Nano Banana Pro, prompt:', imagePrompt.substring(0, 100) + '...');
+      console.log('Generating image with Nano Banana, prompt:', imagePrompt.substring(0, 100) + '...');
       
       const apiKey = process.env.NANO_BANANA_API_KEY;
       
       if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana Pro API key to server/.env');
+        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
       }
 
       // Build request body with prompt and optional character portrait as reference
@@ -216,7 +216,7 @@ export class ImageService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Nano Banana Pro API error:', response.status, errorData);
+        console.error('Nano Banana API error:', response.status, errorData);
         return null;
       }
 
@@ -235,7 +235,7 @@ export class ImageService {
       // If image is returned directly
       if (data.image_url || data.url) {
         const imageUrl = data.image_url || data.url;
-        console.log('Image generated successfully with Nano Banana Pro!');
+        console.log('Image generated successfully with Nano Banana!');
         return {
           imageUrl,
           imagePrompt
@@ -245,10 +245,10 @@ export class ImageService {
       console.error('Unexpected response format from Nano Banana Pro:', data);
       return null;
     } catch (error: any) {
-      console.error('Error generating comic panel image with Nano Banana Pro:', error);
+      console.error('Error generating comic panel image with Nano Banana:', error);
       
       if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana Pro API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
+        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
       }
       
       // Return null to allow story to continue without image
@@ -278,14 +278,14 @@ export class ImageService {
   }
 
   /**
-   * Generate a character portrait for consistency using Nano Banana Pro
+   * Generate a character portrait for consistency using Nano Banana Free
    */
   static async generateCharacterPortrait(character: Character, existingPortraitUrl?: string): Promise<string | null> {
     try {
       const apiKey = process.env.NANO_BANANA_API_KEY;
       
       if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana Pro API key to server/.env');
+        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
       }
 
       // Extract clothing items from inventory
@@ -307,7 +307,7 @@ export class ImageService {
 
       // If we have an existing portrait, edit it instead of generating new
       if (existingPortraitUrl) {
-        console.log('Editing existing character portrait with Nano Banana Pro');
+        console.log('Editing existing character portrait with Nano Banana');
         
         const response = await fetch(`${NANO_BANANA_API_URL}/images/edit`, {
           method: 'POST',
@@ -326,7 +326,7 @@ export class ImageService {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          console.error('Nano Banana Pro edit API error:', response.status, errorData);
+          console.error('Nano Banana edit API error:', response.status, errorData);
           // Fall through to generate new if edit fails
         } else {
           const data: any = await response.json();
@@ -334,18 +334,18 @@ export class ImageService {
           if (data.task_id) {
             const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
             if (imageUrl) {
-              console.log('Character portrait edited successfully with Nano Banana Pro!');
+              console.log('Character portrait edited successfully with Nano Banana!');
               return imageUrl;
             }
           } else if (data.image_url || data.url) {
-            console.log('Character portrait edited successfully with Nano Banana Pro!');
+            console.log('Character portrait edited successfully with Nano Banana!');
             return data.image_url || data.url;
           }
         }
       }
 
       // Generate new portrait if no existing one or edit failed
-      console.log('Generating new character portrait with Nano Banana Pro');
+      console.log('Generating new character portrait with Nano Banana');
       
       const generatePrompt = `Anime style cyberpunk character portrait illustration, 
       visual illustration only, no text blocks, 
@@ -376,7 +376,7 @@ export class ImageService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Nano Banana Pro API error for portrait:', response.status, errorData);
+        console.error('Nano Banana API error for portrait:', response.status, errorData);
         return null;
       }
 
@@ -385,24 +385,24 @@ export class ImageService {
       if (data.task_id) {
         const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
         if (imageUrl) {
-          console.log('Character portrait generated successfully with Nano Banana Pro!');
+          console.log('Character portrait generated successfully with Nano Banana!');
           return imageUrl;
         }
         return null;
       }
       
       if (data.image_url || data.url) {
-        console.log('Character portrait generated successfully with Nano Banana Pro!');
+        console.log('Character portrait generated successfully with Nano Banana!');
         return data.image_url || data.url;
       }
 
-      console.error('Unexpected response format from Nano Banana Pro for portrait:', data);
+      console.error('Unexpected response format from Nano Banana for portrait:', data);
       return null;
     } catch (error: any) {
-      console.error('Error generating character portrait with Nano Banana Pro:', error);
+      console.error('Error generating character portrait with Nano Banana:', error);
       
       if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana Pro API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
+        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
       }
       
       return null;
@@ -421,14 +421,14 @@ export class ImageService {
       const apiKey = process.env.NANO_BANANA_API_KEY;
       
       if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana Pro API key to server/.env');
+        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
       }
 
       if (!existingPortraitUrl) {
         throw new Error('Existing portrait URL is required for editing');
       }
 
-      console.log('Editing character portrait with custom prompt:', customPrompt);
+      console.log('Editing character portrait with Nano Banana, custom prompt:', customPrompt);
       
       // Build the edit prompt - combine custom prompt with character context
       const editPrompt = `${customPrompt}. Keep the same character, same pose, same background style, but apply the requested changes. Maintain anime cyberpunk art style.`;
@@ -450,7 +450,7 @@ export class ImageService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Nano Banana Pro edit API error:', response.status, errorData);
+          console.error('Nano Banana edit API error:', response.status, errorData);
         return null;
       }
 
@@ -470,13 +470,13 @@ export class ImageService {
         return data.image_url || data.url;
       }
 
-      console.error('Unexpected response format from Nano Banana Pro for portrait edit:', data);
+      console.error('Unexpected response format from Nano Banana for portrait edit:', data);
       return null;
     } catch (error: any) {
-      console.error('Error editing character portrait with Nano Banana Pro:', error);
+      console.error('Error editing character portrait with Nano Banana:', error);
       
       if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana Pro API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
+        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
       }
       
       return null;
