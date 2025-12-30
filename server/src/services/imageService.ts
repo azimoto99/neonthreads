@@ -4,9 +4,10 @@ import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using Nano Banana Pro API for image generation
+// Using Nano Banana Free API for image generation
+// Note: Free tier may have rate limits and lower resolution
 const NANO_BANANA_API_URL = 'https://gateway.nanobananapro.site/api/v1';
-const NANO_BANANA_MODEL = 'nano-banana-pro';
+const NANO_BANANA_MODEL = 'nano-banana-free'; // Free tier model
 
 export class ImageService {
   /**
