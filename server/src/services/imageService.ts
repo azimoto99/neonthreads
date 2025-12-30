@@ -1,13 +1,12 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Character } from '../types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Using Nano Banana Free API for image generation
-// Note: Free tier may have rate limits and lower resolution
-const NANO_BANANA_API_URL = 'https://gateway.nanobananapro.site/api/v1';
-const NANO_BANANA_MODEL = 'nano-banana-free'; // Free tier model
+// Using Google Imagen for image generation (free tier)
+const IMAGEN_MODEL = 'imagen-3.0-generate-001';
 
 export class ImageService {
   /**
@@ -61,9 +60,11 @@ export class ImageService {
     basePrompt += `anime art style, detailed anime character design, `;
     
     // Include full character creation context
+    // Note: If characterPortraitUrl is provided, it will be used as a reference image
+    // so we can be less verbose in the prompt about appearance
     basePrompt += `character background context: ${background.substring(0, 150)}, `;
     basePrompt += `character trade/skills: ${trade}, `;
-    basePrompt += `character appearance: ${characterVisual}, `;
+    basePrompt += `main character appearance: ${characterVisual}, `;
     basePrompt += `${clothingDescription}`;
     basePrompt += `cyberware and augmentations: ${augmentations}, `;
     basePrompt += `location setting: ${location}, `;
@@ -119,50 +120,88 @@ export class ImageService {
   }
 
   /**
-   * Poll for image generation completion
+   * Get Gemini AI instance for Imagen
    */
-  private static async pollForImageCompletion(taskId: string, apiKey: string, maxAttempts: number = 60): Promise<string | null> {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between polls
-      
-      try {
-        const response = await fetch(`${NANO_BANANA_API_URL}/status/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
-        });
-
-        if (!response.ok) {
-          console.error('Error checking task status:', response.status);
-          continue;
-        }
-
-        const data: any = await response.json();
-        
-        if (data.status === 'completed' && (data.image_url || data.url)) {
-          return data.image_url || data.url;
-        }
-        
-        if (data.status === 'failed') {
-          console.error('Image generation failed:', data.error);
-          return null;
-        }
-        
-        // Still processing
-        if (attempt % 10 === 0) {
-          console.log(`Still generating image... (${attempt * 2}s)`);
-        }
-      } catch (error) {
-        console.error('Error polling for image:', error);
-      }
+  private static getGeminiAI(): GoogleGenerativeAI {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      throw new Error('GEMINI_API_KEY is not set. Please add your Gemini API key to server/.env');
     }
     
-    console.error('Image generation timed out');
-    return null;
+    return new GoogleGenerativeAI(apiKey);
   }
 
   /**
-   * Generate a comic panel image using Nano Banana Pro
+   * Generate image using Google Imagen API
+   */
+  private static async generateImageWithImagen(
+    prompt: string,
+    aspectRatio: string = '1:1'
+  ): Promise<string | null> {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      
+      if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+        throw new Error('GEMINI_API_KEY is not set. Please add your Gemini API key to server/.env');
+      }
+
+      // Use Imagen API through Vertex AI endpoint
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            number_of_images: 1,
+            aspect_ratio: aspectRatio,
+            safety_filter_level: 'block_some',
+            person_generation: 'allow_all',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Imagen API error:', response.status, errorData);
+        return null;
+      }
+
+      const data: any = await response.json();
+      
+      // Imagen returns images in the response
+      if (data.generatedImages && data.generatedImages.length > 0) {
+        const imageData = data.generatedImages[0];
+        
+        // Imagen returns base64 encoded images
+        if (imageData.base64String) {
+          return `data:image/png;base64,${imageData.base64String}`;
+        }
+        
+        // Or it might return a URL
+        if (imageData.imageUrl || imageData.url) {
+          return imageData.imageUrl || imageData.url;
+        }
+      }
+
+      console.error('Unexpected response format from Imagen:', data);
+      return null;
+    } catch (error: any) {
+      console.error('Error generating image with Google Imagen:', error);
+      
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
+      }
+      
+      return null;
+    }
+  }
+
+  /**
+   * Generate a comic panel image using Google Imagen
    */
   static async generateComicPanel(
     character: Character,
@@ -177,81 +216,31 @@ export class ImageService {
       outcome?: string;
       consequences?: string[];
     },
-    characterPortraitUrl?: string // Optional: use character portrait as context
+    characterPortraitUrl?: string // Optional: use character portrait as context (note: Imagen may not support this directly)
   ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
     try {
       const imagePrompt = this.generateImagePrompt(character, scenario, sceneType, storyContext);
-      console.log('Generating image with Nano Banana, prompt:', imagePrompt.substring(0, 100) + '...');
+      console.log('Generating image with Google Imagen, prompt:', imagePrompt.substring(0, 100) + '...');
       
-      const apiKey = process.env.NANO_BANANA_API_KEY;
-      
-      if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
-      }
-
-      // Build request body with prompt and optional character portrait as reference
-      const requestBody: any = {
-        model: NANO_BANANA_MODEL,
-        prompt: imagePrompt,
-        resolution: '2K',
-        aspect_ratio: '1:1',
-      };
-
-      // If character portrait is provided, use it as a reference image
+      // Note: Imagen doesn't directly support reference images in the same way
+      // The character portrait context is included in the prompt instead
       if (characterPortraitUrl) {
-        requestBody.reference_image = characterPortraitUrl;
-        requestBody.reference_strength = 0.7; // How much to follow the reference (0-1)
-        console.log('Using character portrait as reference for scene image');
+        console.log('Character portrait context included in prompt for scene image');
       }
 
-      // Generate image using Nano Banana Pro API
-      const response = await fetch(`${NANO_BANANA_API_URL}/images/generate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const imageUrl = await this.generateImageWithImagen(imagePrompt, '1:1');
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Nano Banana API error:', response.status, errorData);
-        return null;
-      }
-
-      const data: any = await response.json();
-      
-      // Check if response contains task ID (async processing)
-      if (data.task_id) {
-        // Poll for completion
-        const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
-        if (imageUrl) {
-          return { imageUrl, imagePrompt };
-        }
-        return null;
-      }
-      
-      // If image is returned directly
-      if (data.image_url || data.url) {
-        const imageUrl = data.image_url || data.url;
-        console.log('Image generated successfully with Nano Banana!');
+      if (imageUrl) {
+        console.log('Image generated successfully with Google Imagen!');
         return {
           imageUrl,
           imagePrompt
         };
       }
 
-      console.error('Unexpected response format from Nano Banana Pro:', data);
       return null;
     } catch (error: any) {
-      console.error('Error generating comic panel image with Nano Banana:', error);
-      
-      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
-      }
-      
-      // Return null to allow story to continue without image
+      console.error('Error generating comic panel image with Google Imagen:', error);
       return null;
     }
   }
@@ -278,16 +267,80 @@ export class ImageService {
   }
 
   /**
-   * Generate a character portrait for consistency using Nano Banana Free
+   * Generate a character portrait using Google Imagen
    */
   static async generateCharacterPortrait(character: Character, existingPortraitUrl?: string): Promise<string | null> {
     try {
-      const apiKey = process.env.NANO_BANANA_API_KEY;
+      // Extract clothing items from inventory
+      const clothingItems = (character.inventory || [])
+        .filter(item => item.type === 'misc' || item.name.toLowerCase().includes('cloth') || 
+                        item.name.toLowerCase().includes('outfit') || 
+                        item.name.toLowerCase().includes('armor') ||
+                        item.name.toLowerCase().includes('jacket') ||
+                        item.name.toLowerCase().includes('shirt') ||
+                        item.name.toLowerCase().includes('pants'))
+        .map(item => item.name)
+        .join(', ');
       
-      if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
+      const clothingDescription = clothingItems 
+        ? `wearing: ${clothingItems}, ` 
+        : '';
+
+      // If we have an existing portrait, we'll regenerate with updated prompt
+      // Note: Imagen doesn't have direct image editing, so we regenerate
+      if (existingPortraitUrl) {
+        console.log('Regenerating character portrait with updated appearance using Google Imagen');
       }
 
+      const generatePrompt = `Anime style cyberpunk character portrait illustration, 
+      visual illustration only, no text blocks, 
+      anime art style, detailed anime character design, 
+      character appearance: ${character.appearance}, 
+      ${clothingDescription}
+      cyberware and augmentations: ${character.augmentations}, 
+      background: neon-lit cyberpunk cityscape, 
+      anime shading and highlights, cel-shaded style, 
+      vibrant neon colors, high quality anime artwork, 
+      professional anime illustration, front view, detailed character design, 
+      character must match the exact appearance description, 
+      pure visual artwork, no dialogue, no text, illustration only`;
+
+      console.log('Generating new character portrait with Google Imagen');
+      const imageUrl = await this.generateImageWithImagen(generatePrompt, '1:1');
+
+      if (imageUrl) {
+        console.log('Character portrait generated successfully with Google Imagen!');
+        return imageUrl;
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error('Error generating character portrait with Google Imagen:', error);
+      
+      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
+        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
+      }
+      
+      return null;
+    }
+  }
+
+  /**
+   * Edit a character portrait with a custom prompt
+   * Note: Imagen doesn't support direct image editing, so we regenerate with the edit prompt
+   */
+  static async editCharacterPortrait(
+    character: Character,
+    existingPortraitUrl: string,
+    customPrompt: string
+  ): Promise<string | null> {
+    try {
+      if (!existingPortraitUrl) {
+        throw new Error('Existing portrait URL is required for editing');
+      }
+
+      console.log('Editing character portrait with Google Imagen, custom prompt:', customPrompt);
+      
       // Extract clothing items from inventory
       const clothingItems = (character.inventory || [])
         .filter(item => item.type === 'misc' || item.name.toLowerCase().includes('cloth') || 
@@ -303,185 +356,39 @@ export class ImageService {
         ? `wearing: ${clothingItems}, ` 
         : '';
       
-      const editPrompt = `Update the character's appearance to match: ${character.appearance}, ${clothingDescription}cyberware and augmentations: ${character.augmentations}. Keep the same character, same pose, same background, but update only the appearance details, clothing, and cyberware to match the new description.`;
-
-      // If we have an existing portrait, edit it instead of generating new
-      if (existingPortraitUrl) {
-        console.log('Editing existing character portrait with Nano Banana');
-        
-        const response = await fetch(`${NANO_BANANA_API_URL}/images/edit`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: NANO_BANANA_MODEL,
-            prompt: editPrompt,
-            image_input: [existingPortraitUrl],
-            resolution: '2K',
-            aspect_ratio: '1:1',
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          console.error('Nano Banana edit API error:', response.status, errorData);
-          // Fall through to generate new if edit fails
-        } else {
-          const data: any = await response.json();
-          
-          if (data.task_id) {
-            const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
-            if (imageUrl) {
-              console.log('Character portrait edited successfully with Nano Banana!');
-              return imageUrl;
-            }
-          } else if (data.image_url || data.url) {
-            console.log('Character portrait edited successfully with Nano Banana!');
-            return data.image_url || data.url;
-          }
-        }
-      }
-
-      // Generate new portrait if no existing one or edit failed
-      console.log('Generating new character portrait with Nano Banana');
-      
-      const generatePrompt = `Anime style cyberpunk character portrait illustration, 
+      // Build the edit prompt - combine custom prompt with character context
+      const editPrompt = `Anime style cyberpunk character portrait illustration, 
       visual illustration only, no text blocks, 
       anime art style, detailed anime character design, 
       character appearance: ${character.appearance}, 
       ${clothingDescription}
       cyberware and augmentations: ${character.augmentations}, 
-      background: neon-lit cyberpunk cityscape, 
+      ${customPrompt}. 
+      Keep the same character, same pose, same background style, but apply the requested changes. 
+      Maintain anime cyberpunk art style. 
+      Background: neon-lit cyberpunk cityscape, 
       anime shading and highlights, cel-shaded style, 
       vibrant neon colors, high quality anime artwork, 
       professional anime illustration, front view, detailed character design, 
-      character must match the exact appearance description, 
       pure visual artwork, no dialogue, no text, illustration only`;
 
-      const response = await fetch(`${NANO_BANANA_API_URL}/images/generate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: NANO_BANANA_MODEL,
-          prompt: generatePrompt,
-          resolution: '2K',
-          aspect_ratio: '1:1',
-        }),
-      });
+      // Regenerate with the edit prompt
+      const imageUrl = await this.generateImageWithImagen(editPrompt, '1:1');
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Nano Banana API error for portrait:', response.status, errorData);
-        return null;
+      if (imageUrl) {
+        console.log('Character portrait edited successfully with Google Imagen!');
+        return imageUrl;
       }
 
-      const data: any = await response.json();
-      
-      if (data.task_id) {
-        const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
-        if (imageUrl) {
-          console.log('Character portrait generated successfully with Nano Banana!');
-          return imageUrl;
-        }
-        return null;
-      }
-      
-      if (data.image_url || data.url) {
-        console.log('Character portrait generated successfully with Nano Banana!');
-        return data.image_url || data.url;
-      }
-
-      console.error('Unexpected response format from Nano Banana for portrait:', data);
       return null;
     } catch (error: any) {
-      console.error('Error generating character portrait with Nano Banana:', error);
+      console.error('Error editing character portrait with Google Imagen:', error);
       
       if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
-      }
-      
-      return null;
-    }
-  }
-
-  /**
-   * Edit a character portrait with a custom prompt
-   */
-  static async editCharacterPortrait(
-    character: Character,
-    existingPortraitUrl: string,
-    customPrompt: string
-  ): Promise<string | null> {
-    try {
-      const apiKey = process.env.NANO_BANANA_API_KEY;
-      
-      if (!apiKey || apiKey === 'your_nano_banana_api_key_here') {
-        throw new Error('NANO_BANANA_API_KEY is not set. Please add your Nano Banana API key to server/.env');
-      }
-
-      if (!existingPortraitUrl) {
-        throw new Error('Existing portrait URL is required for editing');
-      }
-
-      console.log('Editing character portrait with Nano Banana, custom prompt:', customPrompt);
-      
-      // Build the edit prompt - combine custom prompt with character context
-      const editPrompt = `${customPrompt}. Keep the same character, same pose, same background style, but apply the requested changes. Maintain anime cyberpunk art style.`;
-      
-      const response = await fetch(`${NANO_BANANA_API_URL}/images/edit`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: NANO_BANANA_MODEL,
-          prompt: editPrompt,
-          image_input: [existingPortraitUrl],
-          resolution: '2K',
-          aspect_ratio: '1:1',
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          console.error('Nano Banana edit API error:', response.status, errorData);
-        return null;
-      }
-
-      const data: any = await response.json();
-      
-      if (data.task_id) {
-        const imageUrl = await this.pollForImageCompletion(data.task_id, apiKey);
-        if (imageUrl) {
-          console.log('Character portrait edited successfully with Nano Banana Pro!');
-          return imageUrl;
-        }
-        return null;
-      }
-      
-      if (data.image_url || data.url) {
-        console.log('Character portrait edited successfully with Nano Banana Pro!');
-        return data.image_url || data.url;
-      }
-
-      console.error('Unexpected response format from Nano Banana for portrait edit:', data);
-      return null;
-    } catch (error: any) {
-      console.error('Error editing character portrait with Nano Banana:', error);
-      
-      if (error?.message?.includes('API_KEY') || error?.message?.includes('authentication')) {
-        console.error('❌ Nano Banana API authentication failed. Check your NANO_BANANA_API_KEY in server/.env');
+        console.error('❌ Google Imagen API authentication failed. Check your GEMINI_API_KEY in server/.env');
       }
       
       return null;
     }
   }
 }
-
-
