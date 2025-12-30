@@ -358,7 +358,7 @@ export class ImageService {
       pure visual artwork, no dialogue, no text, illustration only`;
 
       console.log('Generating new character portrait');
-      const imageUrl = await this.generateImageWithHF(generatePrompt, '1:1');
+      const imageUrl = await this.generateImageWithReplicate(generatePrompt, '1:1');
 
       if (imageUrl) {
         console.log('Character portrait generated successfully!');
