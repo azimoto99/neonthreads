@@ -420,7 +420,7 @@ export class ImageService {
       pure visual artwork, no dialogue, no text, illustration only`;
 
       // Regenerate with the edit prompt
-      const imageUrl = await this.generateImageWithHF(editPrompt, '1:1');
+      const imageUrl = await this.generateImageWithReplicate(editPrompt, '1:1');
 
       if (imageUrl) {
         console.log('Character portrait edited successfully!');
