@@ -166,7 +166,7 @@ export class ImageService {
       }
 
       const response = await fetch(
-        `${HF_API_URL}/${HF_IMAGE_MODEL}`,
+        `${HF_API_URL}/models/${HF_IMAGE_MODEL}`,
         {
           method: 'POST',
           headers,
