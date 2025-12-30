@@ -7,7 +7,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Using Hugging Face Inference API for free image generation
 // Note: This is a free alternative since Google Imagen requires special access
-const HF_API_URL = 'https://api-inference.huggingface.co/models';
+const HF_API_URL = 'https://router.huggingface.co';
 const HF_IMAGE_MODEL = 'stabilityai/stable-diffusion-xl-base-1.0'; // Free model
 
 export class ImageService {
